@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import Navbar from './Navbar';
 
 const Signup = () => {
   const navigate = useNavigate();
@@ -56,24 +57,18 @@ const Signup = () => {
     e.preventDefault();
     if (validate()) {
       console.log('Signup successful', formData);
-      // Proceed with signup logic
+      // Role-based redirection
+      if (formData.role === 'sales_manager') {
+        navigate('/manager-dash');
+      } else if (formData.role === 'sales_representative') {
+        navigate('/rep-dash');
+      }
     }
   };
 
   return (
     <div className="min-h-screen bg-[#e6f2f0] flex flex-col">
-      {/* Navbar on Signup Page */}
-      <nav className="py-6 px-10 flex justify-between items-center">
-        <div className="flex items-center gap-2.5 font-sans font-extrabold text-2xl text-black">
-          <div className="w-6 h-6 bg-black rounded" />
-          <span>LeadFlow</span>
-        </div>
-        <ul className="flex gap-8 text-sm font-medium text-muted">
-          <li><Link to="/" className="hover:text-primary transition-colors">Overview</Link></li>
-          <li><Link to="/" className="hover:text-primary transition-colors">Plans</Link></li>
-          <li><Link to="/" className="hover:text-primary transition-colors">Support</Link></li>
-        </ul>
-      </nav>
+      <Navbar />
 
       {/* Signup Card Container */}
       <div className="flex-1 flex items-center justify-center p-5 py-10">
