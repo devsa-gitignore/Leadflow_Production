@@ -1,11 +1,20 @@
-import Landing from './components/Landing'
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import Landing from './components/Landing';
+import Login from './components/Login';
+import Signup from './components/Signup';
 
 function App() {
   return (
-    <div className="App">
-      <Landing />
-    </div>
-  )
+    <Router>
+      <div className="App">
+        <Routes>
+          <Route path="/" element={<Landing />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/signup" element={<Signup />} />
+        </Routes>
+      </div>
+    </Router>
+  );
 }
 
-export default App
+export default App;

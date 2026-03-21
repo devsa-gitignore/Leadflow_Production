@@ -1,5 +1,6 @@
 import React from 'react';
 import Navbar from './Navbar';
+import { Link } from 'react-router-dom';
 
 const Hero = () => (
   <section className="text-center py-24 px-5">
@@ -12,12 +13,12 @@ const Hero = () => (
         with our intuitive sales management platform.
       </p>
       <div className="flex justify-center gap-4 font-sans font-semibold">
-        <button className="bg-primary text-white px-8 py-3 rounded-lg hover:bg-[#0a3d37] transition-all hover:-translate-y-0.5 shadow-sm">
+        <Link to="/signup" className="bg-primary text-white px-8 py-3 rounded-lg hover:bg-[#0a3d37] transition-all hover:-translate-y-0.5 shadow-sm text-center">
           Get Started
-        </button>
-        <button className="bg-white/60 text-primary px-8 py-3 rounded-lg border border-primary/10 hover:bg-white/80 transition-all hover:-translate-y-0.5 shadow-sm">
+        </Link>
+        <Link to="/login" className="bg-white/60 text-primary px-8 py-3 rounded-lg border border-primary/10 hover:bg-white/80 transition-all hover:-translate-y-0.5 shadow-sm text-center">
           Log In
-        </button>
+        </Link>
       </div>
     </div>
   </section>
