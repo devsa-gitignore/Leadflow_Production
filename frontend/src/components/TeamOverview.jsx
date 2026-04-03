@@ -4,8 +4,19 @@ import {
   PieChart, Pie 
 } from 'recharts';
 import DashboardLayout from './DashboardLayout';
+import { getCurrentUser } from '../utils/auth';
+import { useState, useEffect } from 'react';
 
 const TeamOverview = () => {
+  const [user, setUser] = useState(null);
+
+  useEffect(() => {
+    const currentUser = getCurrentUser();
+    if (currentUser) {
+      setUser(currentUser);
+    }
+  }, []);
+
   const teamMembers = [
     { name: 'Arjun Raval', role: 'Senior Sales Exec', progress: 92, selected: true },
     { name: 'Ananya Jha', role: 'Account Executive', progress: 78, selected: false },
@@ -49,9 +60,9 @@ const TeamOverview = () => {
 
   return (
     <DashboardLayout 
-      role="sales_manager"
-      userName="Anshika Rawat" 
-      userRole="Sales Manager"
+      role={user?.role || "sales_manager"}
+      userName={user?.fullName || "User"} 
+      userRole={user?.role?.replace('_', ' ') || "Manager"}
     >
       <div className="flex flex-col lg:flex-row w-full bg-[#ecf5f3] rounded-3xl overflow-hidden shadow-sm border border-teal-100">
         

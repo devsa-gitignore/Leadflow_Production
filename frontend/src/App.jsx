@@ -10,7 +10,11 @@ import Invoices from './components/Invoices';
 import Reports from "./components/Reports";
 import CalendarPage from './components/CalendarPage';
 import TodoPage from './components/TodoPage';
+
 import Settings from './components/Settings';
+
+
+import ProfilePage from './components/ProfilePage';
 
 
 function App() {
@@ -37,6 +41,7 @@ function App() {
 
           <Route path="/calendar" element={<CalendarPage />}/>
           <Route path="/todo" element={<TodoPage />}/>
+          <Route path="/profile" element={<ProfilePage />}/>
         </Routes>
       </div>
     </Router>
