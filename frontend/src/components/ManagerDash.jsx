@@ -164,7 +164,7 @@ const ManagerDash = () => {
 
           {/* Calendar */}
           <div className="min-h-0">
-              <Calendar />
+              <Calendar variant="mini" />
           </div>
         </div>
       </div>

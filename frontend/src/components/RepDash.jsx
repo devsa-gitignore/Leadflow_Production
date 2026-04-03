@@ -167,7 +167,7 @@ const RepDash = () => {
               </div>
           </div>
 
-          <Calendar />
+          <Calendar variant="mini" />
         </div>
       </div>
     </DashboardLayout>
