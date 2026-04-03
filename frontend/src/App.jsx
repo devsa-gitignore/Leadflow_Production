@@ -10,6 +10,8 @@ import Invoices from './components/Invoices';
 import Reports from "./components/Reports";
 import CalendarPage from './components/CalendarPage';
 import TodoPage from './components/TodoPage';
+import Settings from './components/Settings';
+
 
 function App() {
   return (
@@ -19,13 +21,20 @@ function App() {
           <Route path="/" element={<Landing />} />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
-          <Route path="/manager-dash" element={<ManagerDash />}/>
-          <Route path="/rep-dash" element={<RepDash />} />
+          <Route 
+  path="/dashboard" 
+  element={
+    localStorage.getItem("role") === "sales_manager"
+      ? <ManagerDash />
+      : <RepDash />
+  } 
+/>
           <Route path="/team-overview" element={<TeamOverview />} />
           <Route path="/mypipeline" element={<MyPipeline />}/>
           <Route path="/Invoices" element={<Invoices />}/>
           <Route path="/Reports" element={<Reports />}/>
-          
+          <Route path="/settings" element={<Settings />} />
+
           <Route path="/calendar" element={<CalendarPage />}/>
           <Route path="/todo" element={<TodoPage />}/>
         </Routes>
