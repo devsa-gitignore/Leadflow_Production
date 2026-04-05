@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Landing from './components/Landing';
 import Login from './components/Login';
 import Signup from './components/Signup';
@@ -12,9 +12,13 @@ import CalendarPage from './components/CalendarPage';
 import TodoPage from './components/TodoPage';
 
 import Settings from './components/Settings';
-
-
 import ProfilePage from './components/ProfilePage';
+import { getCurrentUser } from './utils/auth';
+
+const DashboardRouter = () => {
+  const user = getCurrentUser();
+  return user?.role === 'sales_manager' ? <ManagerDash /> : <RepDash />;
+};
 
 
 function App() {
@@ -25,14 +29,9 @@ function App() {
           <Route path="/" element={<Landing />} />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
-          <Route 
-  path="/dashboard" 
-  element={
-    localStorage.getItem("role") === "sales_manager"
-      ? <ManagerDash />
-      : <RepDash />
-  } 
-/>
+          <Route path="/dashboard" element={<DashboardRouter />} />
+          <Route path="/rep-dash" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/manager-dash" element={<Navigate to="/dashboard" replace />} />
           <Route path="/team-overview" element={<TeamOverview />} />
           <Route path="/mypipeline" element={<MyPipeline />}/>
           <Route path="/Invoices" element={<Invoices />}/>

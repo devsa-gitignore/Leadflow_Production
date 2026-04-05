@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import Navbar2 from './Navbar2';
 import { getCurrentUser } from '../utils/auth';
@@ -24,7 +25,12 @@ const Settings = () => {
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
-  const handleSave = () => alert("Changes have been successfully saved!");
+  const navigate = useNavigate();
+
+  const handleSave = () => {
+    alert("Changes have been successfully saved!");
+    navigate('/dashboard');
+  };
   const handleDiscard = () => window.location.reload();
   const handlePasswordChange = () => alert("Opening password reset flow...");
   const handleDeleteAccount = () => {
@@ -123,11 +129,11 @@ const Settings = () => {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 relative">
                       <div>
                         <label className="block text-xs font-bold text-[#597876] tracking-wider uppercase mb-2">FULL NAME</label>
-                        <input type="text" defaultValue="Arjun Raval" className="w-full bg-white rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#0e4e48]/50 shadow-sm text-[#143e3c] font-semibold" />
+                        <input type="text" defaultValue={user?.fullName || "Arjun Raval"} className="w-full bg-white rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#0e4e48]/50 shadow-sm text-[#143e3c] font-semibold" />
                       </div>
                       <div>
                         <label className="block text-xs font-bold text-[#597876] tracking-wider uppercase mb-2">EMAIL ADDRESS</label>
-                        <input type="email" defaultValue="arjun.n@leadflow.io" className="w-full bg-white rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#0e4e48]/50 shadow-sm text-[#143e3c] font-semibold" />
+                        <input type="email" defaultValue={user?.email || "arjun.n@leadflow.io"} className="w-full bg-white rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#0e4e48]/50 shadow-sm text-[#143e3c] font-semibold" />
                       </div>
                     </div>
                     <div className="relative">

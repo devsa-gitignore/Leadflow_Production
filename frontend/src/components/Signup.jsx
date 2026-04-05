@@ -60,12 +60,8 @@ const Signup = () => {
       try {
         const user = signup(formData);
         console.log('Signup successful', user);
-        // Role-based redirection
-        if (user.role === 'sales_manager') {
-          navigate('/manager-dash');
-        } else if (user.role === 'sales_representative') {
-          navigate('/rep-dash');
-        }
+        // Role-based routing is handled dynamically in App.jsx
+        navigate('/dashboard');
       } catch (err) {
         setErrors({ ...errors, email: err.message });
       }

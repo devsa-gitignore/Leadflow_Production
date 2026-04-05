@@ -4,6 +4,38 @@ import Todo from './Todo';
 import DashboardLayout from './DashboardLayout';
 import { getCurrentUser } from '../utils/auth';
 
+const AnimatedNumber = ({ value, prefix = '', suffix = '', isCurrency = false, duration = 1000 }) => {
+  const [current, setCurrent] = useState(0);
+
+  useEffect(() => {
+    let startTime;
+    let animationFrame;
+    const animate = (time) => {
+      if (!startTime) startTime = time;
+      const progress = Math.min((time - startTime) / duration, 1);
+      
+      const easeProgress = 1 - Math.pow(1 - progress, 4); // easeOutQuart
+      
+      setCurrent(value * easeProgress);
+
+      if (progress < 1) {
+        animationFrame = requestAnimationFrame(animate);
+      }
+    };
+
+    animationFrame = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(animationFrame);
+  }, [value, duration]);
+
+  const formatted = isCurrency 
+    ? Math.round(current).toLocaleString() 
+    : Number.isInteger(value) 
+      ? Math.round(current) 
+      : current.toFixed(1);
+
+  return <>{prefix}{formatted}{suffix}</>;
+};
+
 const RepDash = () => {
   const [user, setUser] = useState(null);
 
@@ -15,10 +47,10 @@ const RepDash = () => {
   }, []);
 
   const stats = [
-    { label: 'LEADS ASSIGNED TODAY', value: '14', trend: '+5%', positive: true },
-    { label: 'MY PIPELINE VALUE', value: '$52k', trend: '+8%', positive: true },
-    { label: 'PERSONAL CONVERSION', value: '28%', trend: '-2%', positive: false },
-    { label: 'PENDING FOLLOW-UPS', value: '09', trend: '+1%', positive: true },
+    { label: 'LEADS ASSIGNED TODAY', value: 14, prefix: '', suffix: '', trend: '+5%', positive: true },
+    { label: 'MY PIPELINE VALUE', value: 52, prefix: '$', suffix: 'k', trend: '+8%', positive: true },
+    { label: 'PERSONAL CONVERSION', value: 28, prefix: '', suffix: '%', trend: '-2%', positive: false },
+    { label: 'PENDING FOLLOW-UPS', value: 9, prefix: '0', suffix: '', trend: '+1%', positive: true },
   ];
 
   const initialTodoItems = [
@@ -55,7 +87,9 @@ const RepDash = () => {
               <div key={i} className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 transition-transform hover:-translate-y-1">
                 <p className="text-[10px] font-bold text-[#5a827d] mb-2 tracking-wider">{stat.label}</p>
                 <div className="flex items-end justify-between">
-                  <span className="text-2xl font-extrabold text-[#0e4d46]">{stat.value}</span>
+                  <span className="text-2xl font-extrabold text-[#0e4d46]">
+                    <AnimatedNumber value={stat.value} prefix={stat.prefix} suffix={stat.suffix} duration={1500} />
+                  </span>
                   <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${stat.positive ? 'text-green-600 bg-green-50' : 'text-red-600 bg-red-50'}`}>
                     {stat.trend}
                   </span>
@@ -146,7 +180,9 @@ const RepDash = () => {
               <div className="flex justify-between items-center px-2">
                   <div className="text-center">
                       <p className="text-[10px] font-bold text-[#5a827d] uppercase mb-1">Current Achieved</p>
-                      <p className="text-lg font-bold text-[#0e4d46]">6 Deals</p>
+                      <p className="text-lg font-bold text-[#0e4d46]">
+                         <AnimatedNumber value={6} suffix=" Deals" duration={1500} />
+                      </p>
                   </div>
                   <div className="text-center">
                       <p className="text-[10px] font-bold text-[#5a827d] uppercase mb-1">Goal Target</p>
