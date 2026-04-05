@@ -95,6 +95,196 @@ const MonthView = ({ fYear, fMonth, fFirstDay, fDaysIn, events, selectedDayFull,
   );
 };
 
+const CreateEventView = ({ onSave, onCancel }) => {
+  const [title, setTitle] = useState('');
+  const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
+  const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
+  const [startTime, setStartTime] = useState('10:00');
+  const [endTime, setEndTime] = useState('11:00');
+  const [allDay, setAllDay] = useState(false);
+  const [location, setLocation] = useState('');
+  const [description, setDescription] = useState('');
+
+  const handleSave = (e) => {
+    e.preventDefault();
+    onSave({
+      title: title || 'Untitled Event',
+      time: `${startTime} - ${endTime}`,
+      location: location || 'No location',
+      description: description || 'No description',
+      hour: parseInt(startTime.split(':')[0]) || 10
+    });
+  };
+
+  return (
+    <div className="flex w-full h-[calc(100vh-80px)] overflow-hidden bg-transparent pt-4">
+      {/* Left Form Area */}
+      <div className="flex-1 flex flex-col pl-8 pr-16 pb-8 overflow-y-auto space-y-8">
+        
+        <input 
+          type="text" 
+          placeholder="Add title" 
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          className="w-full bg-transparent text-4xl mt-4 font-bold text-[#0e4d46] placeholder:text-[#a3c2c0] border-none outline-none focus:ring-0 px-0"
+        />
+
+        {/* Date and Time */}
+        <div className="flex items-start gap-4 text-[#5a827d]">
+          {/* Clock Icon */}
+          <div className="mt-2 text-[#a3c2c0]">
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          
+          <div className="flex flex-col space-y-3 flex-1">
+            <div className="flex items-center gap-4">
+              <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="w-fit bg-white px-4 py-2 border-none rounded-xl text-sm font-semibold text-gray-700 shadow-sm focus:ring-2 focus:ring-[#0e4d46]/20 outline-none" placeholder="DD/MM/YYYY" />
+              <input type="time" value={startTime} onChange={e => setStartTime(e.target.value)} className="w-fit bg-white px-4 py-2 border-none rounded-xl text-sm font-semibold text-gray-700 shadow-sm focus:ring-2 focus:ring-[#0e4d46]/20 outline-none" placeholder="10:00" />
+              <span className="text-gray-400 font-bold">—</span>
+              <input type="time" value={endTime} onChange={e => setEndTime(e.target.value)} className="w-fit bg-white px-4 py-2 border-none rounded-xl text-sm font-semibold text-gray-700 shadow-sm focus:ring-2 focus:ring-[#0e4d46]/20 outline-none" placeholder="11:00" />
+            </div>
+            
+            <div className="flex items-center gap-4">
+              <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="w-fit bg-white px-4 py-2 border-none rounded-xl text-sm font-semibold text-gray-700 shadow-sm focus:ring-2 focus:ring-[#0e4d46]/20 outline-none" placeholder="DD/MM/YYYY" />
+            </div>
+
+            <div className="flex items-center gap-4 pt-1">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={allDay} onChange={e => setAllDay(e.target.checked)} className="rounded border-gray-300 text-[#0e4d46] focus:ring-[#0e4d46] w-4 h-4 cursor-pointer" />
+                <span className="text-sm font-bold text-gray-600">All day</span>
+              </label>
+              <button type="button" className="text-sm font-bold text-[#0e4d46] hover:underline">Timezone</button>
+            </div>
+          </div>
+        </div>
+
+        {/* Location */}
+        <div className="flex items-center gap-4 text-[#5a827d]">
+          <div className="text-[#a3c2c0]">
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+          </div>
+          <input 
+            type="text" 
+            placeholder="Add location" 
+            value={location}
+            onChange={(e) => setLocation(e.target.value)}
+            className="flex-1 bg-transparent border-t border-b border-gray-200/60 py-4 text-sm font-medium text-gray-700 placeholder:text-gray-400 outline-none focus:border-[#a3c2c0] transition-colors"
+          />
+        </div>
+
+        {/* Description / Attachments */}
+        <div className="flex items-start gap-4 text-[#5a827d]">
+          <div className="mt-4 text-[#a3c2c0]">
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          </div>
+          <textarea 
+            placeholder="Add description or attachments" 
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            rows="6"
+            className="flex-1 bg-transparent border-b border-gray-200/60 py-4 text-sm font-medium text-gray-700 placeholder:text-gray-400 outline-none focus:border-[#a3c2c0] transition-colors resize-none"
+          />
+        </div>
+
+        {/* Notification */}
+        <div className="flex items-center gap-4 text-[#5a827d] pt-2">
+          <div className="text-[#a3c2c0] opacity-0"><svg className="w-5 h-5" /></div>
+          <div className="flex flex-col space-y-3">
+            <div className="flex items-center gap-2 text-sm font-semibold text-gray-600">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+              </svg>
+              <span>30 minutes before</span>
+              <button type="button" className="text-gray-400 hover:text-gray-600 ml-1">
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+            <button type="button" className="text-sm font-bold text-[#0e4d46] hover:underline flex items-center gap-1 w-fit">
+              + Add notification
+            </button>
+          </div>
+        </div>
+
+      </div>
+
+      {/* Right Sidebar */}
+      <div className="w-[320px] bg-[#f8fafb] rounded-[24px] border border-gray-100/50 shadow-sm flex flex-col overflow-hidden mb-8 mr-8">
+        
+        <div className="p-6 flex-1 overflow-y-auto">
+          {/* Attendees Section */}
+          <div className="mb-8">
+            <h4 className="text-xs font-bold text-[#0e4d46] uppercase tracking-widest mb-4">Attendees</h4>
+            <div className="relative mb-6">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" /></svg>
+              </div>
+              <input type="text" placeholder="Add guests" className="w-full pl-9 pr-4 py-2.5 bg-white border border-gray-200/60 rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#0e4d46]/20 shadow-sm" />
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-[10px] font-bold text-gray-600 shrink-0">JD</div>
+                <div className="flex flex-col">
+                  <span className="text-sm font-bold text-[#0e4d46]">Arjun Raval</span>
+                  <span className="text-[10px] font-semibold text-gray-400">Organizer</span>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-[10px] font-bold text-gray-500 shrink-0">AS</div>
+                <div className="flex flex-col">
+                  <span className="text-sm font-bold text-[#0e4d46]">Sneha Mittal</span>
+                  <span className="text-[10px] font-semibold text-gray-400">Optional</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="w-full h-px bg-gray-100 mb-8"></div>
+
+          {/* Guest Permissions Section */}
+          <div>
+            <h4 className="text-[10px] font-bold text-[#5a827d] uppercase tracking-widest mb-4">Guest Permissions</h4>
+            <div className="space-y-3 bg-transparent">
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input type="checkbox" defaultChecked className="rounded border-gray-300 text-[#0e4d46] focus:ring-[#0e4d46] w-4 h-4 cursor-pointer" />
+                <span className="text-xs font-semibold text-gray-600">Invite others</span>
+              </label>
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input type="checkbox" defaultChecked className="rounded border-gray-300 text-[#0e4d46] focus:ring-[#0e4d46] w-4 h-4 cursor-pointer" />
+                <span className="text-xs font-semibold text-gray-600">See guest list</span>
+              </label>
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input type="checkbox" className="rounded border-gray-300 text-[#0e4d46] focus:ring-[#0e4d46] w-4 h-4 cursor-pointer" />
+                <span className="text-xs font-semibold text-gray-600">Modify event</span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="p-6">
+          <div className="flex items-center gap-3">
+            <button onClick={onCancel} className="flex-1 px-4 py-2.5 rounded-xl text-sm font-bold bg-[#eef6f4] text-[#0e4d46] hover:bg-[#e0f0ed] transition-colors">
+              Cancel
+            </button>
+            <button onClick={handleSave} className="flex-1 px-4 py-2.5 rounded-xl text-sm font-bold bg-black text-white shadow-lg hover:bg-gray-800 transition-colors">
+              Save
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  );
+};
+
 const Calendar = ({ variant = 'mini' }) => {
   const navigate = useNavigate();
   const today = new Date();
@@ -108,7 +298,10 @@ const Calendar = ({ variant = 'mini' }) => {
   });
   const [fullViewDate, setFullViewDate] = useState(today);
   const [selectedDayFull, setSelectedDayFull] = useState(today.getDate());
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  
+  // NEW STATE FOR CREATE VIEW
+  const [isCreateViewOpen, setIsCreateViewOpen] = useState(false);
+  
   const [events, setEvents] = useState({
     [today.getDate()]: [{ 
       title: 'Initial Team Sync', 
@@ -129,7 +322,6 @@ const Calendar = ({ variant = 'mini' }) => {
       hour: 11
     }]
   });
-  const [newMeeting, setNewMeeting] = useState({ title: '', time: '', location: '', description: '', hour: 9 });
   const [view, setView] = useState('Month');
 
   const getCalendarInfo = (date) => {
@@ -138,17 +330,6 @@ const Calendar = ({ variant = 'mini' }) => {
     const firstDay = new Date(year, month, 1).getDay();
     const daysIn = new Date(year, month + 1, 0).getDate();
     return { month, year, firstDay, daysIn };
-  };
-
-  const handleCreateMeeting = (e) => {
-    e.preventDefault();
-    const day = selectedDayFull;
-    setEvents(prev => ({
-      ...prev,
-      [day]: [...(prev[day] || []), { ...newMeeting, attendees: [{ name: 'Me', initials: 'ME' }], type: 'primary' }]
-    }));
-    setIsCreateModalOpen(false);
-    setNewMeeting({ title: '', time: '', location: '', description: '', hour: 10 });
   };
 
   const daysOfWeek = variant === 'mini' 
@@ -227,35 +408,30 @@ const Calendar = ({ variant = 'mini' }) => {
 
   const selectedDayEvents = events[selectedDayFull] || [];
 
-  return (
-    <div className="bg-[#f0f7f6] min-h-screen p-8 relative overflow-x-hidden">
-      {isCreateModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-3xl p-8 w-full max-w-md shadow-2xl animate-in zoom-in-95 duration-200">
-            <h3 className="text-xl font-extrabold text-[#0e4d46] mb-6">Schedule Meeting for {selectedDayFull} {fMonthName}</h3>
-            <form onSubmit={handleCreateMeeting} className="space-y-4">
-              <input type="text" placeholder="Title" required value={newMeeting.title} onChange={e => setNewMeeting({...newMeeting, title: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-[#0e4d46]/10 outline-none" />
-              <div className="flex gap-4">
-                <input type="text" placeholder="Time" required value={newMeeting.time} onChange={e => setNewMeeting({...newMeeting, time: e.target.value})} className="flex-1 px-4 py-3 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-[#0e4d46]/10 outline-none" />
-                <select value={newMeeting.hour} onChange={e => setNewMeeting({...newMeeting, hour: parseInt(e.target.value)})} className="px-4 py-3 rounded-xl border border-gray-200 text-sm outline-none">
-                  {[8,9,10,11,12,13,14,15,16,17,18,19,20].map(h => <option key={h} value={h}>{h > 12 ? `${h-12} PM` : h === 12 ? '12 PM' : `${h} AM`}</option>)}
-                </select>
-              </div>
-              <input type="text" placeholder="Location/Link" required value={newMeeting.location} onChange={e => setNewMeeting({...newMeeting, location: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-[#0e4d46]/10 outline-none" />
-              <textarea placeholder="Description" rows="3" value={newMeeting.description} onChange={e => setNewMeeting({...newMeeting, description: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-[#0e4d46]/10 outline-none" />
-              <div className="flex gap-4 pt-2">
-                <button type="button" onClick={() => setIsCreateModalOpen(false)} className="flex-1 py-3 text-sm font-bold text-[#5a827d] hover:bg-gray-50 rounded-xl transition-all">Cancel</button>
-                <button type="submit" className="flex-1 py-3 text-sm font-bold bg-[#0e4d46] text-white rounded-xl shadow-lg hover:bg-[#0a3d37] transition-all">Confirm</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+  if (isCreateViewOpen) {
+    return (
+      <div className="bg-[#eef6f4] min-h-screen relative overflow-hidden">
+        <CreateEventView 
+          onSave={(newMeeting) => {
+             const day = selectedDayFull;
+             setEvents(prev => ({
+               ...prev,
+               [day]: [...(prev[day] || []), { ...newMeeting, attendees: [{ name: 'Me', initials: 'ME' }], type: 'primary' }]
+             }));
+             setIsCreateViewOpen(false);
+          }}
+          onCancel={() => setIsCreateViewOpen(false)}
+        />
+      </div>
+    );
+  }
 
-      <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden flex flex-col h-full">
+  return (
+    <div className="bg-[#f0f7f6] min-h-screen p-8 relative overflow-x-hidden pt-6">
+      <div className="bg-white rounded-[24px] shadow-sm border border-gray-100 overflow-hidden flex flex-col h-full w-full">
         <div className="p-6 flex flex-wrap items-center justify-between gap-4 border-b border-gray-50">
           <div className="flex items-center gap-6">
-            <button onClick={() => setIsCreateModalOpen(true)} className="bg-[#0e4d46] text-white px-6 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 hover:bg-[#0a3d37] transition-all shadow-sm">
+            <button onClick={() => setIsCreateViewOpen(true)} className="bg-[#0e4d46] text-white px-6 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 hover:bg-[#0a3d37] transition-all shadow-sm">
               <span className="text-xl leading-none">+</span> Create
             </button>
             <div className="flex items-center gap-4">
