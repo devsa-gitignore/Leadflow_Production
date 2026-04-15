@@ -19,9 +19,8 @@ const CalendarPage = () => {
       userName={user?.fullName || "User"} 
       userRole={user?.role?.replace('_', ' ') || "Representative"}
     >
-      <div className="relative z-10 w-full max-w-4xl mx-auto">
-        <h2 className="text-[11px] text-[#5a827d] font-extrabold uppercase tracking-widest mb-6 px-1 text-center sm:text-left">Full Calendar</h2>
-        <Calendar />
+      <div className="w-full">
+        <Calendar variant="full" />
       </div>
     </DashboardLayout>
   );

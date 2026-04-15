@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 
 const Navbar2 = ({ userName, userRole, profileImage, placeholder, toggleSidebar }) => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -58,12 +59,12 @@ const Navbar2 = ({ userName, userRole, profileImage, placeholder, toggleSidebar 
           </svg>
           <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
         </button>
-        <div className="flex items-center gap-3">
-          <div className="text-right">
+        <Link to="/profile" className="flex items-center gap-3 group transition-all">
+          <div className="text-right group-hover:opacity-80 transition-opacity">
             <p className="text-sm font-bold text-[#0e4d46]">{userName}</p>
             <p className="text-[10px] font-semibold text-[#5a827d] uppercase tracking-wider">{userRole}</p>
           </div>
-          <div className="w-10 h-10 rounded-full bg-gray-200 border-2 border-white shadow-sm overflow-hidden flex items-center justify-center">
+          <div className="w-10 h-10 rounded-full bg-gray-200 border-2 border-white shadow-sm overflow-hidden flex items-center justify-center group-hover:ring-2 group-hover:ring-[#0e4d46]/20 transition-all">
             {profileImage ? (
               <img src={profileImage} alt={userName} className="w-full h-full object-cover" />
             ) : (
@@ -72,7 +73,7 @@ const Navbar2 = ({ userName, userRole, profileImage, placeholder, toggleSidebar 
               </svg>
             )}
           </div>
-        </div>
+        </Link>
       </div>
     </header>
   );

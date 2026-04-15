@@ -4,6 +4,38 @@ import Todo from './Todo';
 import DashboardLayout from './DashboardLayout';
 import { getCurrentUser } from '../utils/auth';
 
+const AnimatedNumber = ({ value, prefix = '', suffix = '', isCurrency = false, duration = 1000 }) => {
+  const [current, setCurrent] = useState(0);
+
+  useEffect(() => {
+    let startTime;
+    let animationFrame;
+    const animate = (time) => {
+      if (!startTime) startTime = time;
+      const progress = Math.min((time - startTime) / duration, 1);
+      
+      const easeProgress = 1 - Math.pow(1 - progress, 4); // easeOutQuart
+      
+      setCurrent(value * easeProgress);
+
+      if (progress < 1) {
+        animationFrame = requestAnimationFrame(animate);
+      }
+    };
+
+    animationFrame = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(animationFrame);
+  }, [value, duration]);
+
+  const formatted = isCurrency 
+    ? Math.round(current).toLocaleString() 
+    : Number.isInteger(value) 
+      ? Math.round(current) 
+      : current.toFixed(1);
+
+  return <>{prefix}{formatted}{suffix}</>;
+};
+
 const ManagerDash = () => {
   const [user, setUser] = useState(null);
 
@@ -15,11 +47,11 @@ const ManagerDash = () => {
   }, []);
 
   const stats = [
-    { label: 'TOTAL PIPELINE VALUE', value: '$1.2M', trend: '+6%', positive: true },
-    { label: 'TOTAL REVENUE', value: '$450k', trend: '+8%', positive: true },
-    { label: 'TEAM CONVERSION', value: '24%', trend: '-2%', positive: false },
-    { label: 'OVERDUE FOLLOW-UPS', value: '12', trend: '5%', positive: true },
-    { label: 'DEALS CLOSING', value: '8', trend: '+4%', positive: true },
+    { label: 'TOTAL PIPELINE VALUE', value: 1.2, prefix: '$', suffix: 'M', trend: '+6%', positive: true },
+    { label: 'TOTAL REVENUE', value: 450, prefix: '$', suffix: 'k', trend: '+8%', positive: true },
+    { label: 'TEAM CONVERSION', value: 24, prefix: '', suffix: '%', trend: '-2%', positive: false },
+    { label: 'OVERDUE FOLLOW-UPS', value: 12, prefix: '', suffix: '', trend: '5%', positive: true },
+    { label: 'DEALS CLOSING', value: 8, prefix: '', suffix: '',  trend: '+4%', positive: true },
   ];
 
   const teamData = [
@@ -51,7 +83,9 @@ const ManagerDash = () => {
               <div key={i} className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 transition-transform hover:-translate-y-1">
                 <p className="text-[10px] font-bold text-[#5a827d] mb-2 tracking-wider">{stat.label}</p>
                 <div className="flex items-end justify-between">
-                  <span className="text-2xl font-extrabold text-[#0e4d46]">{stat.value}</span>
+                  <span className="text-2xl font-extrabold text-[#0e4d46]">
+                    <AnimatedNumber value={stat.value} prefix={stat.prefix} suffix={stat.suffix} duration={1500} />
+                  </span>
                   <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${stat.positive ? 'text-green-600 bg-green-50' : 'text-red-600 bg-red-50'}`}>
                     {stat.trend}
                   </span>
@@ -153,7 +187,9 @@ const ManagerDash = () => {
               <div className="flex justify-between items-center px-2">
                   <div className="text-center">
                       <p className="text-[10px] font-bold text-[#5a827d] uppercase mb-1">Current Achieved</p>
-                      <p className="text-lg font-bold text-[#0e4d46]">$450k</p>
+                      <p className="text-lg font-bold text-[#0e4d46]">
+                         <AnimatedNumber value={450} prefix="$" suffix="k" duration={1500} />
+                      </p>
                   </div>
                   <div className="text-center">
                       <p className="text-[10px] font-bold text-[#5a827d] uppercase mb-1">Goal Target</p>
@@ -164,7 +200,7 @@ const ManagerDash = () => {
 
           {/* Calendar */}
           <div className="min-h-0">
-              <Calendar />
+              <Calendar variant="mini" />
           </div>
         </div>
       </div>
