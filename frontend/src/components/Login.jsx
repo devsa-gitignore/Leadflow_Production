@@ -172,6 +172,7 @@
 // export default Login;
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import Navbar from './Navbar';
 import { login } from '../utils/auth';
 
@@ -306,9 +307,19 @@ navigate('/dashboard');
                 <button 
                   type="button"
                   onClick={togglePasswordVisibility}
-                  className="absolute right-4 top-1/2 -translate-y-1/2"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-primary transition-colors"
                 >
-                  👁
+                  {showPassword ? (
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+                      <line x1="1" y1="1" x2="23" y2="23" />
+                    </svg>
+                  ) : (
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                      <circle cx="12" cy="12" r="3" />
+                    </svg>
+                  )}
                 </button>
               </div>
 
@@ -317,25 +328,42 @@ navigate('/dashboard');
               )}
             </div>
 
-            {/* ROLE */}
+            {/* ROLE TOGGLE */}
             <div>
-              <label className="block text-sm font-medium mb-1">Role</label>
-              <select 
-                className={`w-full px-4 py-3 rounded-xl bg-[#f8fafb] border ${
-                  errors.role ? 'border-red-500' : 'border-gray-100'
-                }`}
-                value={formData.role}
-                onChange={(e) =>
-                  setFormData({ ...formData, role: e.target.value })
-                }
-              >
-                <option value="">Select your role</option>
-                <option value="sales_manager">Sales manager</option>
-                <option value="sales_representative">Sales representative</option>
-              </select>
+              <label className="block text-sm font-medium mb-3">Login as</label>
+              <div className="relative flex p-1.5 bg-[#f0f7f6] rounded-2xl border border-teal-50 shadow-inner">
+                {/* Background Slider */}
+                <motion.div
+                  className="absolute left-1.5 top-1.5 bottom-1.5 w-[calc(50%-6px)] bg-white rounded-xl shadow-md z-0"
+                  initial={false}
+                  animate={{
+                    x: formData.role === 'sales_representative' ? '100%' : '0%',
+                  }}
+                  transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                />
+
+                <button
+                  type="button"
+                  onClick={() => setFormData({ ...formData, role: 'sales_manager' })}
+                  className={`relative z-10 flex-1 py-2.5 text-sm font-bold transition-colors ${
+                    formData.role === 'sales_manager' ? 'text-primary' : 'text-slate-500'
+                  }`}
+                >
+                  Sales Manager
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFormData({ ...formData, role: 'sales_representative' })}
+                  className={`relative z-10 flex-1 py-2.5 text-sm font-bold transition-colors ${
+                    formData.role === 'sales_representative' ? 'text-primary' : 'text-slate-500'
+                  }`}
+                >
+                  Sales Rep
+                </button>
+              </div>
 
               {errors.role && (
-                <p className="text-red-500 text-xs mt-1">{errors.role}</p>
+                <p className="text-red-500 text-xs mt-2 ml-1">{errors.role}</p>
               )}
             </div>
 
