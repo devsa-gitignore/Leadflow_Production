@@ -14,6 +14,7 @@ import TodoPage from './components/TodoPage';
 import Settings from './components/Settings';
 import ProfilePage from './components/ProfilePage';
 import { getCurrentUser } from './utils/auth';
+import { ProtectedRoute, PublicRoute } from './components/AuthGuards';
 
 const DashboardRouter = () => {
   const user = getCurrentUser();
@@ -27,20 +28,25 @@ function App() {
       <div className="App">
         <Routes>
           <Route path="/" element={<Landing />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/signup" element={<Signup />} />
-          <Route path="/dashboard" element={<DashboardRouter />} />
+          
+          {/* Public-only routes (redirect to dashboard if logged in) */}
+          <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
+          <Route path="/signup" element={<PublicRoute><Signup /></PublicRoute>} />
+          
+          {/* Protected routes (redirect to login if not logged in) */}
+          <Route path="/dashboard" element={<ProtectedRoute><DashboardRouter /></ProtectedRoute>} />
+          <Route path="/team-overview" element={<ProtectedRoute><TeamOverview /></ProtectedRoute>} />
+          <Route path="/mypipeline" element={<ProtectedRoute><MyPipeline /></ProtectedRoute>}/>
+          <Route path="/Invoices" element={<ProtectedRoute><Invoices /></ProtectedRoute>}/>
+          <Route path="/Reports" element={<ProtectedRoute><Reports /></ProtectedRoute>}/>
+          <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+          <Route path="/calendar" element={<ProtectedRoute><CalendarPage /></ProtectedRoute>}/>
+          <Route path="/todo" element={<ProtectedRoute><TodoPage /></ProtectedRoute>}/>
+          <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>}/>
+
+          {/* Legacy redirects */}
           <Route path="/rep-dash" element={<Navigate to="/dashboard" replace />} />
           <Route path="/manager-dash" element={<Navigate to="/dashboard" replace />} />
-          <Route path="/team-overview" element={<TeamOverview />} />
-          <Route path="/mypipeline" element={<MyPipeline />}/>
-          <Route path="/Invoices" element={<Invoices />}/>
-          <Route path="/Reports" element={<Reports />}/>
-          <Route path="/settings" element={<Settings />} />
-
-          <Route path="/calendar" element={<CalendarPage />}/>
-          <Route path="/todo" element={<TodoPage />}/>
-          <Route path="/profile" element={<ProfilePage />}/>
         </Routes>
       </div>
     </Router>

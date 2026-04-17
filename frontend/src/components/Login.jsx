@@ -172,7 +172,7 @@
 // export default Login;
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion as Motion } from 'framer-motion';
 import Navbar from './Navbar';
 import { login } from '../utils/auth';
 
@@ -182,9 +182,10 @@ const Login = () => {
   const [formData, setFormData] = useState({
     email: '',
     password: '',
-    role: ''
+    role: 'sales_manager'
   });
   const [errors, setErrors] = useState({});
+  const [isLoading, setIsLoading] = useState(false);
 
   const validate = () => {
     const newErrors = {};
@@ -211,31 +212,22 @@ const Login = () => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
     if (validate()) {
+      setIsLoading(true);
+      setErrors({});
       try {
-        const user = login(formData.email, formData.password);
-console.log('Login successful', user);
+        const user = await login(formData.email, formData.password, formData.role);
+        console.log('Login successful', user);
 
-// STORE FIRST
-localStorage.setItem("role", user.role);
-localStorage.setItem("name", user.fullName);
-
-// THEN VALIDATE ROLE
-if (user.role !== formData.role) {
-  setErrors({
-    ...errors,
-    role: `You are registered as a ${user.role.replace('_', ' ')}`
-  });
-  return;
-}
-
-// NAVIGATE
-navigate('/dashboard');
+        // NAVIGATE
+        navigate('/dashboard');
       } catch (err) {
         setErrors({ ...errors, email: err.message });
+      } finally {
+        setIsLoading(false);
       }
     }
   };
@@ -268,6 +260,44 @@ navigate('/dashboard');
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
+            {/* ROLE TOGGLE */}
+            <div>
+              <label className="block text-sm font-medium mb-3">Position / Role</label>
+              <div className="relative flex p-1.5 bg-[#f0f7f6] rounded-2xl border border-teal-50 shadow-inner">
+                {/* Background Slider */}
+                <Motion.div
+                  className="absolute left-1.5 top-1.5 bottom-1.5 w-[calc(50%-6px)] bg-primary rounded-xl shadow-md z-0"
+                  initial={false}
+                  animate={{
+                    x: formData.role === 'sales_representative' ? '100%' : '0%',
+                  }}
+                  transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                />
+
+                <button
+                  type="button"
+                  onClick={() => setFormData({ ...formData, role: 'sales_manager' })}
+                  className={`relative z-10 flex-1 py-2.5 text-sm font-bold transition-colors ${
+                    formData.role === 'sales_manager' ? 'text-white' : 'text-slate-500'
+                  }`}
+                >
+                  Sales Manager
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFormData({ ...formData, role: 'sales_representative' })}
+                  className={`relative z-10 flex-1 py-2.5 text-sm font-bold transition-colors ${
+                    formData.role === 'sales_representative' ? 'text-white' : 'text-slate-500'
+                  }`}
+                >
+                  Sales Rep
+                </button>
+              </div>
+
+              {errors.role && (
+                <p className="text-red-500 text-xs mt-2 ml-1">{errors.role}</p>
+              )}
+            </div>
 
             {/* EMAIL */}
             <div>
@@ -328,51 +358,15 @@ navigate('/dashboard');
               )}
             </div>
 
-            {/* ROLE TOGGLE */}
-            <div>
-              <label className="block text-sm font-medium mb-3">Login as</label>
-              <div className="relative flex p-1.5 bg-[#f0f7f6] rounded-2xl border border-teal-50 shadow-inner">
-                {/* Background Slider */}
-                <motion.div
-                  className="absolute left-1.5 top-1.5 bottom-1.5 w-[calc(50%-6px)] bg-white rounded-xl shadow-md z-0"
-                  initial={false}
-                  animate={{
-                    x: formData.role === 'sales_representative' ? '100%' : '0%',
-                  }}
-                  transition={{ type: "spring", stiffness: 400, damping: 30 }}
-                />
-
-                <button
-                  type="button"
-                  onClick={() => setFormData({ ...formData, role: 'sales_manager' })}
-                  className={`relative z-10 flex-1 py-2.5 text-sm font-bold transition-colors ${
-                    formData.role === 'sales_manager' ? 'text-primary' : 'text-slate-500'
-                  }`}
-                >
-                  Sales Manager
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setFormData({ ...formData, role: 'sales_representative' })}
-                  className={`relative z-10 flex-1 py-2.5 text-sm font-bold transition-colors ${
-                    formData.role === 'sales_representative' ? 'text-primary' : 'text-slate-500'
-                  }`}
-                >
-                  Sales Rep
-                </button>
-              </div>
-
-              {errors.role && (
-                <p className="text-red-500 text-xs mt-2 ml-1">{errors.role}</p>
-              )}
-            </div>
-
             {/* BUTTON */}
             <button 
               type="submit"
-              className="w-full bg-primary text-white py-3 rounded-xl font-bold"
+              disabled={isLoading}
+              className={`w-full bg-primary text-white py-3 rounded-xl font-bold transition-all shadow-lg shadow-primary/10 mt-2 ${
+                isLoading ? 'opacity-70 cursor-not-allowed' : 'hover:bg-[#0a3d37]'
+              }`}
             >
-              Login
+              {isLoading ? 'Logging in...' : 'Login'}
             </button>
           </form>
 
