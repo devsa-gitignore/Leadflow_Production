@@ -1,5 +1,6 @@
 import logging
 
+from django.conf import settings
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -61,10 +62,31 @@ def signup(request):
         result = serializer.create(serializer.validated_data)
         logger.info("New user signed up | email=%s role=%s",
                     result['user']['email'], result['user']['role'])
-        return Response(
-            {"success": True, "message": "Account created successfully.", **result},
+        
+        response = Response(
+            {"success": True, "message": "Account created successfully.", "user": result['user']},
             status=status.HTTP_201_CREATED,
         )
+        
+        # Set HttpOnly Cookies
+        response.set_cookie(
+            key='access_token',
+            value=result['access'],
+            httponly=True,
+            secure=not settings.DEBUG,
+            samesite='Lax',
+            max_age=3600 * 2 # 2 hours
+        )
+        response.set_cookie(
+            key='refresh_token',
+            value=result['refresh'],
+            httponly=True,
+            secure=not settings.DEBUG,
+            samesite='Lax',
+            max_age=3600 * 24 # 24 hours
+        )
+        
+        return response
     except Exception:
         logger.exception("Unexpected error during signup")
         return Response(
@@ -110,10 +132,31 @@ def login(request):
     result = serializer.to_representation(serializer.validated_data)
     logger.info("User logged in | email=%s role=%s",
                 result['user']['email'], result['user']['role'])
-    return Response(
-        {"success": True, "message": "Login successful.", **result},
+    
+    response = Response(
+        {"success": True, "message": "Login successful.", "user": result['user']},
         status=status.HTTP_200_OK,
     )
+    
+    # Set HttpOnly Cookies
+    response.set_cookie(
+        key='access_token',
+        value=result['access'],
+        httponly=True,
+        secure=not settings.DEBUG,
+        samesite='Lax',
+        max_age=3600 * 2 # 2 hours
+    )
+    response.set_cookie(
+        key='refresh_token',
+        value=result['refresh'],
+        httponly=True,
+        secure=not settings.DEBUG,
+        samesite='Lax',
+        max_age=3600 * 24 # 24 hours
+    )
+    
+    return response
 
 
 @api_view(['POST'])
@@ -132,7 +175,16 @@ def logout(request):
     Blacklists the refresh token so it can no longer be used.
     Requires rest_framework_simplejwt.token_blacklist in INSTALLED_APPS.
     """
-    serializer = LogoutSerializer(data=request.data)
+    # Read refresh token from cookie if not in body
+    refresh_token = request.data.get('refresh') or request.COOKIES.get('refresh_token')
+    
+    if not refresh_token:
+        return Response(
+            {"success": False, "errors": {"refresh": ["Refresh token is required."]}},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    serializer = LogoutSerializer(data={'refresh': refresh_token})
 
     if not serializer.is_valid():
         return Response(
@@ -144,10 +196,17 @@ def logout(request):
         serializer.save()
         logger.info("User logged out | user_id=%s",
                     getattr(request.user, 'id', 'unknown'))
-        return Response(
+        
+        response = Response(
             {"success": True, "message": "Logged out successfully."},
             status=status.HTTP_200_OK,
         )
+        
+        # Clear cookies
+        response.delete_cookie('access_token')
+        response.delete_cookie('refresh_token')
+        
+        return response
     except Exception:
         logger.exception("Logout failed — token blacklist error")
         return Response(
