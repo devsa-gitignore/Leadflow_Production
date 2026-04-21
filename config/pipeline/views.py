@@ -13,13 +13,13 @@ def pipeline_view(request):
     user = request.user  
 
     if user.role and user.role.name == "Sales Rep":
-     deals = Deal.objects.filter(lead__assigned_to=user)
+        deals = Deal.objects.filter(lead__assigned_to=user)
 
     elif user.role and user.role.name == "Sales Manager" and user.team:
-     deals = Deal.objects.filter(lead__assigned_to__team=user.team)
+        deals = Deal.objects.filter(lead__assigned_to__team=user.team)
 
     else:
-     deals = Deal.objects.all()
+        deals = Deal.objects.all()
 
     stages = PipelineStage.objects.all().order_by("order")
 
