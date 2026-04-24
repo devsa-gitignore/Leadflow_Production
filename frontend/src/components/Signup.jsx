@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { motion as Motion } from 'framer-motion';
 import Navbar from './Navbar';
 import { signup } from '../utils/auth';
 
@@ -10,12 +11,13 @@ const Signup = () => {
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
-    role: '',
+    role: 'sales_manager',
     password: '',
     confirmPassword: '',
     agreeToTerms: false
   });
   const [errors, setErrors] = useState({});
+  const [isLoading, setIsLoading] = useState(false);
 
   const validate = () => {
     const newErrors = {};
@@ -54,16 +56,20 @@ const Signup = () => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (validate()) {
+      setIsLoading(true);
+      setErrors({});
       try {
-        const user = signup(formData);
-        console.log('Signup successful', user);
-        // Role-based routing is handled dynamically in App.jsx
-        navigate('/dashboard');
+        const result = await signup(formData);
+        console.log('Signup successful', result);
+        // Navigate to login so user can sign in manually
+        navigate('/login', { state: { message: 'Account created! Please log in.' } });
       } catch (err) {
         setErrors({ ...errors, email: err.message });
+      } finally {
+        setIsLoading(false);
       }
     }
   };
@@ -88,6 +94,45 @@ const Signup = () => {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
+            {/* POSITION/ROLE TOGGLE */}
+            <div>
+              <label className="block text-sm font-bold text-primary mb-3">Position / Role</label>
+              <div className="relative flex p-1.5 bg-[#f0f7f6] rounded-2xl border border-teal-50 shadow-inner">
+                {/* Background Slider */}
+                <Motion.div
+                  className="absolute left-1.5 top-1.5 bottom-1.5 w-[calc(50%-6px)] bg-primary rounded-xl shadow-md z-0"
+                  initial={false}
+                  animate={{
+                    x: formData.role === 'sales_representative' ? '100.5%' : '0%',
+                  }}
+                  transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                />
+
+                <button
+                  type="button"
+                  onClick={() => setFormData({ ...formData, role: 'sales_manager' })}
+                  className={`relative z-10 flex-1 py-2.5 text-sm font-bold transition-colors ${
+                    formData.role === 'sales_manager' ? 'text-white' : 'text-slate-500'
+                  }`}
+                >
+                  Sales Manager
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFormData({ ...formData, role: 'sales_representative' })}
+                  className={`relative z-10 flex-1 py-2.5 text-sm font-bold transition-colors ${
+                    formData.role === 'sales_representative' ? 'text-white' : 'text-slate-500'
+                  }`}
+                >
+                  Sales Rep
+                </button>
+              </div>
+
+              {errors.role && (
+                <p className="text-red-500 text-xs mt-2 ml-1 font-medium">{errors.role}</p>
+              )}
+            </div>
+
             <div>
               <label className="block text-sm font-bold text-primary mb-1">Full Name</label>
               <input 
@@ -110,20 +155,6 @@ const Signup = () => {
                 onChange={(e) => setFormData({...formData, email: e.target.value})}
               />
               {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email}</p>}
-            </div>
-
-            <div>
-              <label className="block text-sm font-bold text-primary mb-1">Position/Role</label>
-              <select 
-                className={`w-full px-4 py-3 rounded-xl bg-white border ${errors.role ? 'border-red-500' : 'border-gray-200'} focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all appearance-none`}
-                value={formData.role}
-                onChange={(e) => setFormData({...formData, role: e.target.value})}
-              >
-                <option value="">Select your role</option>
-                <option value="sales_manager">Sales manager</option>
-                <option value="sales_representative">Sales representative</option>
-              </select>
-              {errors.role && <p className="text-red-500 text-xs mt-1">{errors.role}</p>}
             </div>
 
             <div className="relative">
@@ -204,9 +235,12 @@ const Signup = () => {
 
             <button 
               type="submit"
-              className="w-full bg-primary text-white py-3 rounded-xl font-bold hover:bg-[#0a3d37] transition-all shadow-lg shadow-primary/10 mt-2"
+              disabled={isLoading}
+              className={`w-full bg-primary text-white py-3 rounded-xl font-bold transition-all shadow-lg shadow-primary/10 mt-2 ${
+                isLoading ? 'opacity-70 cursor-not-allowed' : 'hover:bg-[#0a3d37]'
+              }`}
             >
-              Sign Up
+              {isLoading ? 'Creating account...' : 'Sign Up'}
             </button>
           </form>
 

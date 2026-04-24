@@ -6,8 +6,8 @@ const Sidebar = ({ role,active }) => {
   const location = useLocation();
   const navigate = useNavigate();
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
     navigate('/login');
   };
 
@@ -20,7 +20,7 @@ const Sidebar = ({ role,active }) => {
   ];
 
   return (
-    <div className="w-64 bg-[#f8fafb] h-screen border-r border-gray-200 flex flex-col relative">
+    <div className="w-64 bg-[#f8fafb] h-full border-r border-gray-200 flex flex-col relative overflow-y-auto custom-scrollbar">
       <div className="p-6 flex items-center gap-3 mb-8">
         <div className="w-8 h-8 bg-black rounded shrink-0" />
         <span className="text-xl font-extrabold text-[#0e4d46]">LeadFlow</span>

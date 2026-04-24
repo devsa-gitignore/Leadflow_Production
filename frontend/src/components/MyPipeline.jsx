@@ -5,6 +5,8 @@ import DashboardLayout from './DashboardLayout';
 
 const MyPipeline = () => {
   const [user, setUser] = useState(null);
+  const [isOverTrash, setIsOverTrash] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState(null);
 
   useEffect(() => {
     const currentUser = getCurrentUser();
@@ -41,7 +43,7 @@ const MyPipeline = () => {
     ]
   });
 
-  const handleDragEnd = (event, info, listKey, cardId) => {
+  const checkTrashProximity = (info) => {
     const trashBin = document.getElementById('trash-bin');
     if (trashBin) {
       const rect = trashBin.getBoundingClientRect();
@@ -53,13 +55,33 @@ const MyPipeline = () => {
         Math.pow(info.point.y - trashCenterY, 2)
       );
 
-      if (distance < 80) {
-        setLists(prev => ({
-          ...prev,
-          [listKey]: prev[listKey].filter(c => c.id !== cardId)
-        }));
-      }
+      setIsOverTrash(distance < 80);
+      return distance < 80;
     }
+    return false;
+  };
+
+  const handleDragEnd = (event, info, listKey, card) => {
+    const isOver = checkTrashProximity(info);
+    setIsOverTrash(false);
+
+    if (isOver) {
+      setItemToDelete({ ...card, listKey });
+    }
+  };
+
+  const confirmDelete = () => {
+    if (itemToDelete) {
+      setLists(prev => ({
+        ...prev,
+        [itemToDelete.listKey]: prev[itemToDelete.listKey].filter(c => c.id !== itemToDelete.id)
+      }));
+      setItemToDelete(null);
+    }
+  };
+
+  const cancelDelete = () => {
+    setItemToDelete(null);
   };
 
   const getTagColor = (tag) => {
@@ -85,7 +107,8 @@ const MyPipeline = () => {
       exit={{ opacity: 0, scale: 0.5, transition: { duration: 0.2 } }}
       drag
       dragSnapToOrigin
-      onDragEnd={(e, info) => handleDragEnd(e, info, listKey, card.id)}
+      onDrag={(e, info) => checkTrashProximity(info)}
+      onDragEnd={(e, info) => handleDragEnd(e, info, listKey, card)}
       whileDrag={{ scale: 1.05, zIndex: 100, opacity: 0.85, cursor: 'grabbing' }}
       className="bg-white p-4 rounded-xl shadow-[0_2px_10px_rgb(0,0,0,0.02)] border border-gray-100 flex flex-col justify-between h-24 cursor-grab transition-shadow relative bg-clip-padding touch-none z-10"
     >
@@ -192,15 +215,70 @@ const currentUser=getCurrentUser();
       </div>
       
       {/* Trash Bin */}
-      <div 
+      <motion.div 
         id="trash-bin"
-        className="fixed bottom-6 right-6 md:bottom-10 md:right-10 w-12 h-12 bg-white/90 backdrop-blur-sm rounded-full flex justify-center items-center shadow-[0_8px_30px_rgb(0,0,0,0.12)] border-[2px] border-dashed border-red-300 transition-all duration-300 z-[100] group overflow-hidden"
+        animate={{ 
+          scale: isOverTrash ? 1.3 : 1,
+          x: isOverTrash ? [-1, 1, -1, 1, 0] : 0,
+        }}
+        transition={{
+          x: { repeat: Infinity, duration: 0.2 },
+          scale: { type: "spring", stiffness: 300, damping: 20 }
+        }}
+        className={`fixed bottom-6 right-6 md:bottom-10 md:right-10 w-14 h-14 bg-white/90 backdrop-blur-sm rounded-full flex justify-center items-center shadow-[0_8px_30px_rgb(0,0,0,0.12)] border-[2.5px] border-dashed transition-colors duration-300 z-[100] group overflow-hidden ${isOverTrash ? 'border-red-500 bg-red-50' : 'border-red-300'}`}
       >
-        <div className="absolute inset-0 bg-red-50 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-        <svg className="w-5 h-5 text-red-500 relative pointer-events-none group-hover:rotate-[20deg] transition-all duration-300 z-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <div className={`absolute inset-0 bg-red-100 transition-opacity ${isOverTrash ? 'opacity-40' : 'opacity-0'}`}></div>
+        <svg className={`w-6 h-6 relative pointer-events-none transition-all duration-300 z-10 ${isOverTrash ? 'text-red-600 rotate-12 scale-110' : 'text-red-500'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
         </svg>
-      </div>
+      </motion.div>
+
+      {/* Confirmation Modal */}
+      <AnimatePresence>
+        {itemToDelete && (
+          <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={cancelDelete}
+              className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              className="relative bg-white rounded-3xl p-8 shadow-2xl max-w-sm w-full border border-gray-100"
+            >
+              <div className="flex flex-col items-center text-center">
+                <div className="w-16 h-16 bg-red-50 rounded-2xl flex justify-center items-center mb-6">
+                  <svg className="w-8 h-8 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                </div>
+                <h3 className="text-xl font-extrabold text-[#0e4d46] mb-2">Delete Lead?</h3>
+                <p className="text-slate-500 text-sm mb-8 leading-relaxed">
+                  Are you sure you want to delete <span className="font-bold text-[#0e4d46]">"{itemToDelete.company}"</span>? This action cannot be undone.
+                </p>
+                <div className="flex gap-3 w-full">
+                  <button
+                    onClick={cancelDelete}
+                    className="flex-1 px-6 py-3.5 rounded-xl border border-gray-200 text-slate-600 font-bold text-sm hover:bg-gray-50 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={confirmDelete}
+                    className="flex-1 px-6 py-3.5 rounded-xl bg-red-500 text-white font-bold text-sm hover:bg-red-600 shadow-lg shadow-red-200 transition-all active:scale-95"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </DashboardLayout>
   );
 };

@@ -1,14 +1,139 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, Cell, 
   PieChart, Pie 
 } from 'recharts';
 import DashboardLayout from './DashboardLayout';
 import { getCurrentUser } from '../utils/auth';
-import { useState, useEffect } from 'react';
 
 const TeamOverview = () => {
   const [user, setUser] = useState(null);
+  const [searchTerm, setSearchTerm] = useState(''); // Added Search State
+  const [selectedMemberName, setSelectedMemberName] = useState('Arjun Raval');
+
+  // DATA STORE
+  const memberStats = {
+    'Arjun Raval': {
+      role: 'Senior Sales Exec',
+      tags: ['Top Performer', 'Mid-Market'],
+      revenue: '$184,500',
+      winRate: '24.8%',
+      calls: '1,240',
+      meetings: '42',
+      quota: 92,
+      toTarget: '$18.4k',
+      daysLeft: 8,
+      revenueData: [
+        { name: 'JAN', value: 45 }, { name: 'FEB', value: 55 }, { name: 'MAR', value: 40 },
+        { name: 'APR', value: 70 }, { name: 'MAY', value: 85 }, { name: 'JUN', value: 65 },
+      ],
+      stageData: [
+        { name: 'Proposal', value: 42, color: '#cbdad8' },
+        { name: 'Negotiation', value: 28, color: '#0e4d46' },
+        { name: 'Discovery', value: 30, color: '#5a827d' },
+      ],
+      avgDeal: '$15.4k',
+      cycle: '22 Days',
+      retention: '98%',
+      leads: '145'
+    },
+    'Ananya Jha': {
+      role: 'Account Executive',
+      tags: ['Growth Lead', 'Enterprise'],
+      revenue: '$142,000',
+      winRate: '19.5%',
+      calls: '980',
+      meetings: '31',
+      quota: 78,
+      toTarget: '$45.0k',
+      daysLeft: 8,
+      revenueData: [
+        { name: 'JAN', value: 30 }, { name: 'FEB', value: 40 }, { name: 'MAR', value: 50 },
+        { name: 'APR', value: 45 }, { name: 'MAY', value: 60 }, { name: 'JUN', value: 55 },
+      ],
+      stageData: [
+        { name: 'Proposal', value: 20, color: '#cbdad8' },
+        { name: 'Negotiation', value: 50, color: '#0e4d46' },
+        { name: 'Discovery', value: 30, color: '#5a827d' },
+      ],
+      avgDeal: '$22.1k',
+      cycle: '45 Days',
+      retention: '94%',
+      leads: '89'
+    },
+    'Priya Jadhav': {
+      role: 'Regional Lead',
+      tags: ['Elite', 'Strategic'],
+      revenue: '$310,000',
+      winRate: '32.1%',
+      calls: '650',
+      meetings: '54',
+      quota: 100,
+      toTarget: '$0 (Met)',
+      daysLeft: 8,
+      revenueData: [
+        { name: 'JAN', value: 80 }, { name: 'FEB', value: 85 }, { name: 'MAR', value: 90 },
+        { name: 'APR', value: 95 }, { name: 'MAY', value: 100 }, { name: 'JUN', value: 110 },
+      ],
+      stageData: [
+        { name: 'Proposal', value: 35, color: '#cbdad8' },
+        { name: 'Negotiation', value: 35, color: '#0e4d46' },
+        { name: 'Discovery', value: 30, color: '#5a827d' },
+      ],
+      avgDeal: '$45.0k',
+      cycle: '60 Days',
+      retention: '100%',
+      leads: '210'
+    },
+    'Rohan Shah': {
+      role: 'Sales Development',
+      tags: ['SDR', 'Outbound'],
+      revenue: '$62,400',
+      winRate: '12.4%',
+      calls: '2,800',
+      meetings: '88',
+      quota: 64,
+      toTarget: '$22.1k',
+      daysLeft: 8,
+      revenueData: [
+        { name: 'JAN', value: 15 }, { name: 'FEB', value: 20 }, { name: 'MAR', value: 25 },
+        { name: 'APR', value: 22 }, { name: 'MAY', value: 30 }, { name: 'JUN', value: 28 },
+      ],
+      stageData: [
+        { name: 'Proposal', value: 15, color: '#cbdad8' },
+        { name: 'Negotiation', value: 15, color: '#0e4d46' },
+        { name: 'Discovery', value: 70, color: '#5a827d' },
+      ],
+      avgDeal: '$4.2k',
+      cycle: '12 Days',
+      retention: '88%',
+      leads: '540'
+    },
+    'Abhishake Mehta': {
+      role: 'Associate Sales',
+      tags: ['Junior', 'SMB'],
+      revenue: '$45,000',
+      winRate: '10.2%',
+      calls: '1,500',
+      meetings: '24',
+      quota: 45,
+      toTarget: '$55.0k',
+      daysLeft: 8,
+      revenueData: [
+        { name: 'JAN', value: 10 }, { name: 'FEB', value: 12 }, { name: 'MAR', value: 8 },
+        { name: 'APR', value: 15 }, { name: 'MAY', value: 20 }, { name: 'JUN', value: 18 },
+      ],
+      stageData: [
+        { name: 'Proposal', value: 10, color: '#cbdad8' },
+        { name: 'Negotiation', value: 20, color: '#0e4d46' },
+        { name: 'Discovery', value: 70, color: '#5a827d' },
+      ],
+      avgDeal: '$8.1k',
+      cycle: '18 Days',
+      retention: '92%',
+      leads: '110'
+    }
+  };
 
   useEffect(() => {
     const currentUser = getCurrentUser();
@@ -17,36 +142,19 @@ const TeamOverview = () => {
     }
   }, []);
 
-  const teamMembers = [
-    { name: 'Arjun Raval', role: 'Senior Sales Exec', progress: 92, selected: true },
-    { name: 'Ananya Jha', role: 'Account Executive', progress: 78, selected: false },
-    { name: 'Priya Jadhav', role: 'Regional Lead', progress: 100, selected: false },
-    { name: 'Rohan Shah', role: 'Sales Development', progress: 64, selected: false },
-    { name: 'Abhishake Mehta', role: 'Associate Sales', progress: 45, selected: false },
+  // Filter Logic
+  const filteredMembers = Object.keys(memberStats).filter(name => 
+    name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    memberStats[name].role.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const activeData = memberStats[selectedMemberName];
+
+  const quotaPieData = [
+    { name: 'Achieved', value: activeData.quota, color: '#0e4d46' },
+    { name: 'Remaining', value: Math.max(0, 100 - activeData.quota), color: '#e9f1f0' },
   ];
 
-  // Chart Data
-  const revenueData = [
-    { name: 'JAN', value: 45 },
-    { name: 'FEB', value: 55 },
-    { name: 'MAR', value: 40 },
-    { name: 'APR', value: 70 },
-    { name: 'MAY', value: 85 },
-    { name: 'JUN', value: 65 },
-  ];
-
-  const stageData = [
-    { name: 'Proposal', value: 42, color: '#cbdad8' },
-    { name: 'Negotiation', value: 28, color: '#0e4d46' },
-    { name: 'Discovery', value: 30, color: '#5a827d' },
-  ];
-
-  const quotaData = [
-    { name: 'Achieved', value: 92, color: '#0e4d46' },
-    { name: 'Remaining', value: 8, color: '#e9f1f0' },
-  ];
-
-  // Custom tooltips
   const CustomBarTooltip = ({ active, payload }) => {
     if (active && payload && payload.length) {
       return (
@@ -74,6 +182,8 @@ const TeamOverview = () => {
             <input 
               type="text" 
               placeholder="Search executive..." 
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)} // Added Change Handler
               className="w-full py-2.5 pl-10 pr-4 rounded-xl text-sm border-none shadow-sm focus:ring-2 focus:ring-teal-500 text-gray-700 bg-white"
             />
             <svg className="w-4 h-4 absolute left-4 top-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -81,38 +191,49 @@ const TeamOverview = () => {
             </svg>
           </div>
 
-          <div className="flex flex-col gap-3 pr-1 pb-4">
-            {teamMembers.map((member, idx) => (
-              <div 
-                key={idx} 
-                className={`flex items-center p-3.5 rounded-2xl cursor-pointer transition-all ${
-                  member.selected 
-                    ? 'bg-[#0e4d46] text-white shadow-md transform scale-[1.02] border border-[#0e4d46] my-1' 
-                    : 'bg-transparent text-[#0e4d46] hover:bg-white/60 border border-teal-200/50 shadow-sm'
-                }`}
-              >
-                <div className={`w-10 h-10 rounded-xl mr-3 shrink-0 ${member.selected ? 'bg-[#5a827d]/40' : 'bg-[#d0dfdd]'}`}></div>
-                <div className="flex-1 min-w-0">
-                  <div className={`font-bold text-sm truncate ${member.selected ? 'text-white' : 'text-[#0e4d46]'}`}>
-                    {member.name}
+          <div className="flex flex-col gap-3 pr-1 pb-4 min-h-[300px]">
+            {filteredMembers.length > 0 ? (
+              filteredMembers.map((name) => {
+                const member = memberStats[name];
+                const isSelected = selectedMemberName === name;
+                return (
+                  <div 
+                    key={name} 
+                    onClick={() => setSelectedMemberName(name)}
+                    className={`flex items-center p-3.5 rounded-2xl cursor-pointer transition-all ${
+                      isSelected 
+                        ? 'bg-[#0e4d46] text-white shadow-md transform scale-[1.02] border border-[#0e4d46] my-1' 
+                        : 'bg-transparent text-[#0e4d46] hover:bg-white/60 border border-teal-200/50 shadow-sm'
+                    }`}
+                  >
+                    <div className={`w-10 h-10 rounded-xl mr-3 shrink-0 ${isSelected ? 'bg-[#5a827d]/40' : 'bg-[#d0dfdd]'}`}></div>
+                    <div className="flex-1 min-w-0">
+                      <div className={`font-bold text-sm truncate ${isSelected ? 'text-white' : 'text-[#0e4d46]'}`}>
+                        {name}
+                      </div>
+                      <div className={`text-xs mt-0.5 font-bold truncate ${isSelected ? 'text-teal-200' : 'text-[#5a827d]'}`}>
+                        {member.role}
+                      </div>
+                    </div>
+                    <div className="w-12 text-right shrink-0">
+                      <div className={`text-sm font-extrabold ${isSelected ? 'text-white' : 'text-[#0e4d46]'}`}>
+                        {member.quota}%
+                      </div>
+                      <div className="w-full h-1.5 mt-1.5 rounded-full overflow-hidden bg-black/10">
+                        <div 
+                          className={`h-full rounded-full ${isSelected ? 'bg-white' : 'bg-[#0e4d46]'}`} 
+                          style={{ width: `${Math.min(member.quota, 100)}%` }}
+                        ></div>
+                      </div>
+                    </div>
                   </div>
-                  <div className={`text-xs mt-0.5 font-bold truncate ${member.selected ? 'text-teal-200' : 'text-[#5a827d]'}`}>
-                    {member.role}
-                  </div>
-                </div>
-                <div className="w-12 text-right shrink-0">
-                  <div className={`text-sm font-extrabold ${member.selected ? 'text-white' : 'text-[#0e4d46]'}`}>
-                    {member.progress}%
-                  </div>
-                  <div className="w-full h-1.5 mt-1.5 rounded-full overflow-hidden bg-black/10">
-                    <div 
-                      className={`h-full rounded-full ${member.selected ? 'bg-white' : 'bg-[#0e4d46]'}`} 
-                      style={{ width: `${Math.min(member.progress, 100)}%` }}
-                    ></div>
-                  </div>
-                </div>
+                );
+              })
+            ) : (
+              <div className="text-center py-10 text-[#5a827d] text-sm font-bold">
+                No team members found
               </div>
-            ))}
+            )}
           </div>
         </div>
 
@@ -126,17 +247,20 @@ const TeamOverview = () => {
                 <div className="w-16 h-16 rounded-2xl bg-[#d0dfdd] shadow-inner shrink-0"></div>
                 <div className="min-w-0">
                   <h1 className="text-xl md:text-2xl font-extrabold text-[#0e4d46] flex items-center gap-2 truncate">
-                    Arjun Raval
+                    {selectedMemberName}
                     <svg className="w-5 h-5 text-gray-400 mt-1 shrink-0" viewBox="0 0 20 20" fill="currentColor">
                       <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                     </svg>
                   </h1>
                   <div className="flex items-center gap-2 mt-1 hidden sm:flex">
-                    <span className="text-sm font-bold text-[#5a827d] border-none bg-transparent">Senior Sales Executive</span>
+                    <span className="text-sm font-bold text-[#5a827d]">{activeData.role}</span>
                   </div>
                   <div className="flex flex-wrap gap-2 mt-2">
-                    <span className="px-3 py-1 bg-[#5a827d] text-white text-[10px] font-bold rounded-full uppercase tracking-wider">Top Performer</span>
-                    <span className="px-3 py-1 bg-[#f0f9f7] text-[#0e4d46] border border-teal-100 text-[10px] font-bold rounded-full uppercase tracking-wider shadow-sm">Mid-Market</span>
+                    {activeData.tags.map(tag => (
+                      <span key={tag} className={`px-3 py-1 text-[10px] font-bold rounded-full uppercase tracking-wider ${tag === 'Top Performer' || tag === 'Elite' ? 'bg-[#5a827d] text-white' : 'bg-[#f0f9f7] text-[#0e4d46] border border-teal-100 shadow-sm'}`}>
+                        {tag}
+                      </span>
+                    ))}
                   </div>
                 </div>
               </div>
@@ -152,7 +276,6 @@ const TeamOverview = () => {
 
             {/* Top Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-5">
-              {/* 4 Standard Metrics */}
               <div className="lg:col-span-8 grid grid-cols-1 sm:grid-cols-2 gap-5 order-2 lg:order-1">
                 <div className="bg-white p-6 rounded-3xl shadow-sm border border-teal-50 flex items-center gap-5 transition-transform hover:-translate-y-1">
                   <div className="w-12 h-12 rounded-full bg-[#f0f9f7] text-[#0e4d46] flex items-center justify-center shrink-0">
@@ -160,7 +283,7 @@ const TeamOverview = () => {
                   </div>
                   <div className="min-w-0">
                     <div className="text-[11px] text-[#5a827d] font-bold uppercase tracking-widest mb-1">Total Revenue</div>
-                    <div className="text-2xl font-extrabold text-[#0e4d46] truncate">$184,500</div>
+                    <div className="text-2xl font-extrabold text-[#0e4d46] truncate">{activeData.revenue}</div>
                   </div>
                 </div>
                 
@@ -170,7 +293,7 @@ const TeamOverview = () => {
                   </div>
                   <div className="min-w-0">
                     <div className="text-[11px] text-[#5a827d] font-bold uppercase tracking-widest mb-1">Win Rate</div>
-                    <div className="text-2xl font-extrabold text-[#0e4d46] truncate">24.8%</div>
+                    <div className="text-2xl font-extrabold text-[#0e4d46] truncate">{activeData.winRate}</div>
                   </div>
                 </div>
 
@@ -180,7 +303,7 @@ const TeamOverview = () => {
                   </div>
                   <div className="min-w-0">
                     <div className="text-[11px] text-[#5a827d] font-bold uppercase tracking-widest mb-1">Outbound Calls</div>
-                    <div className="text-2xl font-extrabold text-[#0e4d46] truncate">1,240</div>
+                    <div className="text-2xl font-extrabold text-[#0e4d46] truncate">{activeData.calls}</div>
                   </div>
                 </div>
 
@@ -190,48 +313,40 @@ const TeamOverview = () => {
                   </div>
                   <div className="min-w-0">
                     <div className="text-[11px] text-[#5a827d] font-bold uppercase tracking-widest mb-1">Meetings Set</div>
-                    <div className="text-2xl font-extrabold text-[#0e4d46] truncate">42</div>
+                    <div className="text-2xl font-extrabold text-[#0e4d46] truncate">{activeData.meetings}</div>
                   </div>
                 </div>
               </div>
 
-              {/* Quota Circle Metric */}
+              {/* Quota Circle */}
               <div className="lg:col-span-4 bg-white p-6 rounded-3xl shadow-sm border border-teal-50 flex flex-col items-center justify-center text-center order-1 lg:order-2">
                 <div className="relative w-36 h-36 flex items-center justify-center shrink-0">
                   <PieChart width={144} height={144}>
                     <Pie
-                      data={quotaData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={55}
-                      outerRadius={68}
-                      startAngle={90}
-                      endAngle={-270}
-                      dataKey="value"
-                      stroke="none"
-                      cornerRadius={10}
+                      data={quotaPieData}
+                      cx="50%" cy="50%" innerRadius={55} outerRadius={68}
+                      startAngle={90} endAngle={-270} dataKey="value"
+                      stroke="none" cornerRadius={10}
                     >
-                      {quotaData.map((entry, index) => (
+                      {quotaPieData.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={entry.color} />
                       ))}
                     </Pie>
                   </PieChart>
                   <div className="absolute flex flex-col items-center justify-center mt-1 pointer-events-none">
-                    <span className="text-4xl font-extrabold text-[#0e4d46]">92%</span>
+                    <span className="text-4xl font-extrabold text-[#0e4d46]">{activeData.quota}%</span>
                     <span className="text-[9px] text-[#5a827d] font-extrabold uppercase tracking-widest mt-1">Of Quota</span>
                   </div>
                 </div>
                 <div className="mt-2 text-center">
-                  <div className="text-sm font-extrabold text-[#0e4d46]">$18.4k to Target</div>
-                  <div className="text-xs text-[#5a827d] font-bold mt-1">Ends in 8 days</div>
+                  <div className="text-sm font-extrabold text-[#0e4d46]">{activeData.toTarget} to Target</div>
+                  <div className="text-xs text-[#5a827d] font-bold mt-1">Ends in {activeData.daysLeft} days</div>
                 </div>
               </div>
             </div>
 
-            {/* Graphical Section */}
+            {/* Graphs and Metrics remain identical to the previous dynamic version */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-              
-              {/* Bar Chart Real Component */}
               <div className="lg:col-span-8 bg-white p-4 md:p-7 rounded-3xl shadow-sm border border-teal-50">
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
                   <h3 className="font-extrabold text-[#0e4d46] text-lg">Monthly Revenue Trend</h3>
@@ -242,21 +357,12 @@ const TeamOverview = () => {
                 </div>
                 <div className="h-56 w-full mt-4">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={revenueData} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
-                      <XAxis 
-                        dataKey="name" 
-                        axisLine={false} 
-                        tickLine={false} 
-                        tick={{ fontSize: 10, fill: '#5a827d', fontWeight: 'bold' }} 
-                        dy={10} 
-                      />
+                    <BarChart data={activeData.revenueData}>
+                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#5a827d', fontWeight: 'bold' }} dy={10} />
                       <Tooltip content={<CustomBarTooltip />} cursor={{ fill: 'transparent' }} />
                       <Bar dataKey="value" radius={[6, 6, 6, 6]} barSize={12}>
-                        {revenueData.map((entry, index) => (
-                          <Cell 
-                            key={`cell-${index}`} 
-                            fill={entry.name === 'MAY' ? '#0e4d46' : '#e9f1f0'} 
-                          />
+                        {activeData.revenueData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.name === 'MAY' ? '#0e4d46' : '#e9f1f0'} />
                         ))}
                       </Bar>
                     </BarChart>
@@ -264,47 +370,24 @@ const TeamOverview = () => {
                 </div>
               </div>
 
-              {/* Stage Distribution Metric */}
               <div className="lg:col-span-4 bg-white p-6 md:p-7 rounded-3xl shadow-sm border border-teal-50 flex flex-col justify-between">
                 <h3 className="font-extrabold text-[#0e4d46] text-lg mb-6">Stage Distribution</h3>
                 <div className="flex flex-col items-center justify-between mb-8 gap-6">
                   <div className="space-y-4 w-full">
-                    <div className="flex items-center gap-3 text-xs w-full justify-between sm:justify-start">
-                      <div className="flex items-center gap-3">
-                        <div className="w-2.5 h-2.5 rounded-full bg-[#cbdad8] shrink-0"></div>
-                        <span className="text-[#5a827d] font-bold w-16">Proposal</span>
+                    {activeData.stageData.map((stage) => (
+                      <div key={stage.name} className="flex items-center gap-3 text-xs w-full justify-between sm:justify-start">
+                        <div className="flex items-center gap-3">
+                          <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: stage.color }}></div>
+                          <span className="text-[#5a827d] font-bold w-16">{stage.name}</span>
+                        </div>
+                        <span className="font-extrabold text-[#0e4d46] ml-2">{stage.value}%</span>
                       </div>
-                      <span className="font-extrabold text-[#0e4d46] ml-2">42%</span>
-                    </div>
-                    <div className="flex items-center gap-3 text-xs w-full justify-between sm:justify-start">
-                      <div className="flex items-center gap-3">
-                        <div className="w-2.5 h-2.5 rounded-full bg-[#0e4d46] shrink-0"></div>
-                        <span className="text-[#5a827d] font-bold w-16">Negotiation</span>
-                      </div>
-                      <span className="font-extrabold text-[#0e4d46] ml-2">28%</span>
-                    </div>
-                    <div className="flex items-center gap-3 text-xs w-full justify-between sm:justify-start">
-                      <div className="flex items-center gap-3">
-                        <div className="w-2.5 h-2.5 rounded-full bg-[#5a827d] shrink-0"></div>
-                        <span className="text-[#5a827d] font-bold w-16">Discovery</span>
-                      </div>
-                      <span className="font-extrabold text-[#0e4d46] ml-2">30%</span>
-                    </div>
+                    ))}
                   </div>
-                 
                   <div className="shrink-0 flex items-center justify-center">
                     <PieChart width={120} height={120}>
-                      <Pie
-                        data={stageData}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={36}
-                        outerRadius={56}
-                        paddingAngle={2}
-                        dataKey="value"
-                        stroke="none"
-                      >
-                        {stageData.map((entry, index) => (
+                      <Pie data={activeData.stageData} cx="50%" cy="50%" innerRadius={36} outerRadius={56} paddingAngle={2} dataKey="value" stroke="none">
+                        {activeData.stageData.map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={entry.color} />
                         ))}
                       </Pie>
@@ -324,24 +407,18 @@ const TeamOverview = () => {
               </div>
             </div>
 
-            {/* Bottom Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 pb-8">
-              <div className="bg-white p-5 rounded-3xl shadow-sm border border-teal-50 text-center flex flex-col justify-center min-h-[112px] transition-transform hover:-translate-y-1">
-                <div className="text-[10px] text-[#5a827d] font-extrabold uppercase tracking-widest mb-2">Average Deal Size</div>
-                <div className="text-2xl font-extrabold text-[#0e4d46]">$15.4k</div>
-              </div>
-              <div className="bg-white p-5 rounded-3xl shadow-sm border border-teal-50 text-center flex flex-col justify-center min-h-[112px] transition-transform hover:-translate-y-1">
-                <div className="text-[10px] text-[#5a827d] font-extrabold uppercase tracking-widest mb-2">Sales Cycle</div>
-                <div className="text-2xl font-extrabold text-[#0e4d46]">22 Days</div>
-              </div>
-              <div className="bg-white p-5 rounded-3xl shadow-sm border border-teal-50 text-center flex flex-col justify-center min-h-[112px] transition-transform hover:-translate-y-1">
-                <div className="text-[10px] text-[#5a827d] font-extrabold uppercase tracking-widest mb-2">Retention Rate</div>
-                <div className="text-2xl font-extrabold text-[#0e4d46]">98%</div>
-              </div>
-              <div className="bg-white p-5 rounded-3xl shadow-sm border border-teal-50 text-center flex flex-col justify-center min-h-[112px] transition-transform hover:-translate-y-1">
-                <div className="text-[10px] text-[#5a827d] font-extrabold uppercase tracking-widest mb-2">Leads Handled</div>
-                <div className="text-2xl font-extrabold text-[#0e4d46]">145</div>
-              </div>
+              {[
+                { label: 'Average Deal Size', val: activeData.avgDeal },
+                { label: 'Sales Cycle', val: activeData.cycle },
+                { label: 'Retention Rate', val: activeData.retention },
+                { label: 'Leads Handled', val: activeData.leads }
+              ].map((item, i) => (
+                <div key={i} className="bg-white p-5 rounded-3xl shadow-sm border border-teal-50 text-center flex flex-col justify-center min-h-[112px] transition-transform hover:-translate-y-1">
+                  <div className="text-[10px] text-[#5a827d] font-extrabold uppercase tracking-widest mb-2">{item.label}</div>
+                  <div className="text-2xl font-extrabold text-[#0e4d46]">{item.val}</div>
+                </div>
+              ))}
             </div>
 
           </div>
@@ -352,4 +429,3 @@ const TeamOverview = () => {
 };
 
 export default TeamOverview;
-
