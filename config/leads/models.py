@@ -189,6 +189,18 @@ class Deal(models.Model):
     is_lost = models.BooleanField(default=False)
     result = models.CharField(max_length=10, choices=RESULT_CHOICES, null=True, blank=True)
 
+    LEAD_SOURCE_CHOICES = [
+        ("DIRECT", "Direct Search"),
+        ("PAID", "Paid Campaigns"),
+        ("REFERRAL", "Referrals"),
+        ("SOCIAL", "Social Media")
+    ]
+    lead_source = models.CharField(
+        max_length=20,
+        choices=LEAD_SOURCE_CHOICES,
+        default="DIRECT"
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):

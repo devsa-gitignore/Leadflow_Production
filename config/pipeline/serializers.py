@@ -17,7 +17,8 @@ class DealSerializer(serializers.ModelSerializer):
             'company',
             'is_won',
             'is_lost',
-            'result'
+            'result',
+            'lead_source'
         ]
 
     def get_lead_name(self, obj):

@@ -186,11 +186,41 @@ const hardcodedData = {
   }
 };
 
+import { fetchReportsSummary } from '../services/reportService';
+
 const Reports = () => {
   const [user, setUser] = useState(null);
   const [timeRange, setTimeRange] = useState('Last 30 Days');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
+  
+  // Real backend data state
+  const [apiData, setApiData] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  const mapRangeToQuery = (rangeStr) => {
+    if (rangeStr === 'Last 30 Days') return 'last_30_days';
+    if (rangeStr === 'Last Week') return 'last_week';
+    if (rangeStr === 'Last Year') return 'last_year';
+    if (rangeStr === 'Yesterday') return 'yesterday';
+    return 'last_30_days';
+  };
+
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        setLoading(true);
+        const queryRange = mapRangeToQuery(timeRange);
+        const backendData = await fetchReportsSummary(queryRange);
+        setApiData(backendData);
+      } catch (error) {
+        console.error("Failed to load reports data", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadData();
+  }, [timeRange]);
 
   useEffect(() => {
     const currentUser = getCurrentUser();
@@ -209,7 +239,58 @@ const Reports = () => {
     };
   }, []);
 
-  const data = hardcodedData[timeRange];
+  const baseData = hardcodedData[timeRange];
+  
+  const calculateLeadSources = () => {
+    if (!apiData?.lead_source_performance) return baseData.leadSources;
+    
+    const p = apiData.lead_source_performance;
+    const total = p.DIRECT + p.PAID + p.REFERRAL + p.SOCIAL;
+    
+    if (total === 0) return baseData.leadSources;
+    
+    return [
+      { label: 'Direct Search', value: Math.round((p.DIRECT / total) * 100), active: p.DIRECT > 0 },
+      { label: 'Paid Campaigns', value: Math.round((p.PAID / total) * 100), active: p.PAID > 0 },
+      { label: 'Referrals', value: Math.round((p.REFERRAL / total) * 100), active: p.REFERRAL > 0 },
+      { label: 'Social Media', value: Math.round((p.SOCIAL / total) * 100), active: p.SOCIAL > 0 },
+    ].sort((a, b) => b.value - a.value);
+  };
+  
+  const calculateTrendData = () => {
+    if (!apiData?.trend_data) return baseData.trendData;
+    
+    return apiData.trend_data.map((item, idx) => ({
+      month: item.month.toUpperCase(),
+      current: item.amount,
+      previous: baseData.trendData[idx]?.previous || 0
+    }));
+  };
+  
+  // Merge API data with base UI data
+  const data = apiData ? {
+    ...baseData,
+    totalRevenue: apiData.total_revenue,
+    activeLeads: apiData.deals_closed, // Mapping deals closed to the 'Active Leads' card
+    conversionRate: apiData.conversion_rate,
+    
+    // Map Revenue Trend
+    trendData: calculateTrendData(),
+    
+    // Map Invoices to Pie Chart
+    targetData: [
+      { name: 'Paid', value: apiData.paid_amount, color: '#0e4d46' },
+      { name: 'Pending', value: apiData.pending_amount, color: '#f59e0b' },
+      { name: 'Overdue', value: apiData.overdue_amount, color: '#ef4444' }
+    ],
+    // Provide safe defaults for the center text
+    achievedAmount: apiData.paid_amount,
+    targetAmount: apiData.total_invoiced,
+    
+    // Map Lead Source Performance
+    leadSources: calculateLeadSources(),
+  } : baseData;
+
 
   const CustomBarTooltip = ({ active, payload }) => {
     if (active && payload && payload.length) {

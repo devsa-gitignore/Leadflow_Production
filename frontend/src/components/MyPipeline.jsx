@@ -26,6 +26,7 @@ const MyPipeline = () => {
   const [newDealValue, setNewDealValue] = useState('');
   const [newDealPriority, setNewDealPriority] = useState('medium');
   const [newDealResult, setNewDealResult] = useState(''); // New state
+  const [newDealLeadSource, setNewDealLeadSource] = useState('DIRECT');
 
   const loadData = async () => {
     try {
@@ -117,11 +118,13 @@ const MyPipeline = () => {
         deal_value: parseFloat(newDealValue) || 0,
         priority: newDealPriority,
         result: newDealResult || null, // Send if selected
+        lead_source: newDealLeadSource,
         stage: 1
       });
       setNewDealTitle('');
       setNewDealValue('');
       setNewDealResult('');
+      setNewDealLeadSource('DIRECT');
       setIsAdding(null);
       loadData();
     } catch (err) {
@@ -468,6 +471,16 @@ const MyPipeline = () => {
                   <option value="">Select Result (Optional)</option>
                   <option value="WON">WON</option>
                   <option value="LOST">LOST</option>
+                </select>
+
+                <select 
+                  className="w-full px-4 py-3 bg-[#f8fafb] rounded-xl border border-gray-100 font-bold text-sm appearance-none"
+                  value={newDealLeadSource} onChange={e => setNewDealLeadSource(e.target.value)}
+                >
+                  <option value="DIRECT">Direct Search</option>
+                  <option value="PAID">Paid Campaigns</option>
+                  <option value="REFERRAL">Referrals</option>
+                  <option value="SOCIAL">Social Media</option>
                 </select>
                 <div className="flex gap-3 pt-4">
                   <button type="button" onClick={() => setIsAdding(null)} className="flex-1 py-3 px-4 rounded-xl border border-gray-200 font-bold text-sm text-slate-600">Cancel</button>

@@ -179,6 +179,8 @@ def add_deal(request):
     if not stage:
         stage = PipelineStage.objects.first()
 
+    lead_source = request.data.get("lead_source", "DIRECT")
+
     # 5. Create the Deal
     deal = Deal.objects.create(
         lead=lead,
@@ -188,7 +190,8 @@ def add_deal(request):
         stage=stage,
         result=result,
         is_won=(result == 'WON'),
-        is_lost=(result == 'LOST')
+        is_lost=(result == 'LOST'),
+        lead_source=lead_source
     )
 
     return Response(DealSerializer(deal).data, status=201)
