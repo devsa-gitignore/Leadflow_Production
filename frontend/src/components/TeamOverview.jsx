@@ -167,12 +167,7 @@ const TeamOverview = () => {
   };
 
   return (
-    <DashboardLayout 
-      role={user?.role || "sales_manager"}
-      userName={user?.fullName || "User"} 
-      userRole={user?.role?.replace('_', ' ') || "Manager"}
-    >
-      <div className="flex flex-col lg:flex-row w-full bg-[#ecf5f3] rounded-3xl overflow-hidden shadow-sm border border-teal-100">
+    <div className="flex flex-col lg:flex-row w-full bg-[#ecf5f3] rounded-3xl overflow-hidden shadow-sm border border-teal-100">
         
         {/* Left Panel: Team List */}
         <div className="w-full lg:w-[320px] shrink-0 p-6 flex flex-col gap-6 border-b lg:border-b-0 lg:border-r border-teal-100/50 bg-[#e6f2f0]">
@@ -424,7 +419,6 @@ const TeamOverview = () => {
           </div>
         </div>
       </div>
-    </DashboardLayout>
   );
 };
 

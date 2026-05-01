@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import Calendar from './Calendar';
 import Todo from './Todo';
-import DashboardLayout from './DashboardLayout';
 import { getCurrentUser } from '../utils/auth';
+import useDashboardData from '../hooks/useDashboardData';
+import { fetchPipelineData } from '../services/pipelineService';
 
 const AnimatedNumber = ({ value, prefix = '', suffix = '', isCurrency = false, duration = 1000 }) => {
   const [current, setCurrent] = useState(0);
@@ -37,6 +38,9 @@ const AnimatedNumber = ({ value, prefix = '', suffix = '', isCurrency = false, d
 };
 
 const ManagerDash = () => {
+  const { data: dashboardData, loading: dashboardLoading, error: dashboardError } = useDashboardData();
+  const [pipelineData, setPipelineData] = useState(null);
+  const [pipelineLoading, setPipelineLoading] = useState(true);
   const [user, setUser] = useState(null);
 
   useEffect(() => {
@@ -44,22 +48,43 @@ const ManagerDash = () => {
     if (currentUser) {
       setUser(currentUser);
     }
+
+    const getPipeline = async () => {
+      try {
+        const data = await fetchPipelineData();
+        setPipelineData(data.pipeline);
+      } catch (err) {
+        console.error('Failed to fetch pipeline', err);
+      } finally {
+        setPipelineLoading(false);
+      }
+    };
+
+    getPipeline();
   }, []);
 
-  const stats = [
-    { label: 'TOTAL PIPELINE VALUE', value: 1.2, prefix: '$', suffix: 'M', trend: '+6%', positive: true },
-    { label: 'TOTAL REVENUE', value: 450, prefix: '$', suffix: 'k', trend: '+8%', positive: true },
-    { label: 'TEAM CONVERSION', value: 24, prefix: '', suffix: '%', trend: '-2%', positive: false },
-    { label: 'OVERDUE FOLLOW-UPS', value: 12, prefix: '', suffix: '', trend: '5%', positive: true },
-    { label: 'DEALS CLOSING', value: 8, prefix: '', suffix: '',  trend: '+4%', positive: true },
-  ];
+  if (dashboardLoading || pipelineLoading) {
+    return (
+      <div className="flex items-center justify-center h-[60vh]">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 border-4 border-[#0e4d46]/20 border-t-[#0e4d46] rounded-full animate-spin"></div>
+          <p className="text-[#5a827d] font-bold text-sm">Synchronizing your dashboard...</p>
+        </div>
+      </div>
+    );
+  }
 
-  const teamData = [
-    { name: 'Arjun', deals: 14, revenue: '$120,000', conv: '28%', followUps: 5 },
-    { name: 'Priya', deals: 12, revenue: '$105,000', conv: '24%', followUps: 3 },
-    { name: 'Rohan', deals: 10, revenue: '$95,000', conv: '22%', followUps: 8 },
-    { name: 'Ananya', deals: 9, revenue: '$85,000', conv: '21%', followUps: 4 },
-  ];
+  if (dashboardError) {
+    return (
+      <div className="bg-red-50 p-8 rounded-3xl border border-red-100 text-center">
+        <p className="text-red-600 font-bold mb-2">Failed to load dashboard data</p>
+        <p className="text-red-400 text-sm">{dashboardError}</p>
+      </div>
+    );
+  }
+
+  const stats = dashboardData?.stats || [];
+  const teamData = dashboardData?.teamData || [];
 
   const initialTodoItems = [
     { id: 1, task: 'Review Q3 performance with Arjun', due: 'Due today, 4:00 PM', priority: 'High', completed: false },
@@ -69,12 +94,7 @@ const ManagerDash = () => {
   ];
 
   return (
-    <DashboardLayout 
-      role={user?.role}
-      userName={user?.fullName || "Sales Manager"} 
-      userRole={user?.role?.replace('_', ' ') || "Manager"}
-    >
-      <div className="flex flex-col xl:flex-row gap-8">
+    <div className="flex flex-col xl:flex-row gap-8">
         {/* Left Column (Main Content) */}
         <div className="flex-1 space-y-8 min-w-0">
           {/* Stats Grid */}
@@ -90,6 +110,19 @@ const ManagerDash = () => {
                     {stat.trend}
                   </span>
                 </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Pipeline Summary Horizontal Section */}
+          <div className="flex gap-4 overflow-x-auto pb-2 -mx-2 px-2 scrollbar-hide">
+            {pipelineData?.map((stage) => (
+              <div key={stage.stage_id} className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm min-w-[200px] flex-1">
+                <div className="flex justify-between items-start mb-2">
+                   <h3 className="text-[10px] font-bold text-[#5a827d] uppercase tracking-wider">{stage.stage_name}</h3>
+                   <span className="text-[10px] font-bold px-2 py-0.5 bg-gray-50 text-[#0e4d46] rounded-full">{stage.count}</span>
+                </div>
+                <p className="text-lg font-bold text-[#0e4d46]">${(stage.total_value/1000).toFixed(1)}k</p>
               </div>
             ))}
           </div>
@@ -204,7 +237,6 @@ const ManagerDash = () => {
           </div>
         </div>
       </div>
-    </DashboardLayout>
   );
 };
 

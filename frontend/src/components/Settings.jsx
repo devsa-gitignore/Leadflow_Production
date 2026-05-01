@@ -1,10 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import Sidebar from './Sidebar';
-import Navbar2 from './Navbar2';
 import { getCurrentUser } from '../utils/auth';
-
-
 
 const Settings = () => {
    const user = getCurrentUser();
@@ -40,26 +36,7 @@ const Settings = () => {
   };
 
   return (
-    <div className="flex bg-[#e8f1ef] font-sans text-[#1b3d3a] h-screen overflow-hidden">
-      {/* Global Sidebar Component */}
-      <Sidebar role={user?.role} active="settings" />
-
-      {/* Right Main Region */}
-      <main className="flex-1 flex flex-col h-screen">
-        {/* Global Navbar Component */}
-        <div className="px-8 pt-6">
-          <Navbar2 
-            userName={user?.fullName}
-            userRole={
-    user?.role === "sales_manager"
-      ? "Sales Manager"
-      : "Sales Representative"
-  }
-          />
-        </div>
-
-        {/* Scrollable body wrapper */}
-        <div className="flex-1 overflow-y-auto p-8 lg:p-10 scroll-smooth pb-32">
+    <div className="flex-1 overflow-y-auto p-8 lg:p-10 scroll-smooth pb-32">
           
           <div className="flex flex-col lg:flex-row items-start gap-12 lg:gap-16 max-w-6xl">
             
@@ -271,8 +248,6 @@ const Settings = () => {
             </div>
           </div>
         </div>
-      </main>
-    </div>
   );
 };
 

@@ -1,47 +1,116 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getCurrentUser } from '../utils/auth';
-import DashboardLayout from './DashboardLayout';
+import { fetchPipelineData, deleteDeal, createDeal } from '../services/pipelineService';
 
 const MyPipeline = () => {
   const [user, setUser] = useState(null);
   const [isOverTrash, setIsOverTrash] = useState(false);
   const [itemToDelete, setItemToDelete] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const [lists, setLists] = useState({
+    newLead: [],
+    contacted: [],
+    negotiation: [],
+    closedLost: []
+  });
+
+  const [isAdding, setIsAdding] = useState(null); // stores the stage key
+  const [newDealTitle, setNewDealTitle] = useState('');
+  const [newDealValue, setNewDealValue] = useState('');
+  const [newDealPriority, setNewDealPriority] = useState('medium');
+
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      const data = await fetchPipelineData();
+      
+      const newLists = {
+        newLead: [],
+        contacted: [],
+        negotiation: [],
+        closedLost: []
+      };
+
+      data.pipeline.forEach(stage => {
+        const deals = stage.deals.map(deal => ({
+          id: deal.id,
+          company: deal.company || deal.title,
+          value: `$${parseFloat(deal.deal_value).toLocaleString()}`,
+          tag: (deal.priority || 'medium').toUpperCase() + ' PRIORITY'
+        }));
+
+        if (stage.stage_name === 'Discovery') newLists.newLead = deals;
+        else if (stage.stage_name === 'Proposal') newLists.contacted = deals;
+        else if (stage.stage_name === 'Negotiation') newLists.negotiation = deals;
+        else if (stage.stage_name === 'Closed') newLists.closedLost = [...newLists.closedLost, ...deals];
+        else {
+          if (newLists.newLead.length === 0) newLists.newLead = deals;
+        }
+      });
+
+      const closed = data.closed_deals.map(deal => ({
+        id: deal.id,
+        company: deal.company || deal.title,
+        value: `$${parseFloat(deal.deal_value).toLocaleString()}`,
+        tag: 'WON'
+      }));
+      const lost = data.lost_deals.map(deal => ({
+        id: deal.id,
+        company: deal.company || deal.title,
+        value: `$${parseFloat(deal.deal_value).toLocaleString()}`,
+        tag: 'LOST'
+      }));
+      newLists.closedLost = [...newLists.closedLost, ...closed, ...lost];
+
+      setLists(newLists);
+      setError(null);
+    } catch (err) {
+      console.error('Failed to fetch pipeline data:', err);
+      if (err.response?.status === 401) {
+        localStorage.clear();
+        window.location.href = '/login';
+      }
+      setError('Failed to load your pipeline. Please try again later.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     const currentUser = getCurrentUser();
     if (currentUser) {
       setUser(currentUser);
     }
+    loadData();
   }, []);
 
-  const [lists, setLists] = useState({
-    newLead: [
-      { id: 'nl1', company: 'Acme Corp Expansion', value: '$45,000', tag: 'HIGH PRIORITY' },
-      { id: 'nl2', company: 'Global Logistics Portal', value: '$12,500', tag: 'INQUIRY' },
-      { id: 'nl3', company: 'TechSolutions', value: '$28,000', tag: 'MEDIUM PRIORITY' },
-      { id: 'nl4', company: 'Global Dynamics', value: '$55,000', tag: 'HIGH PRIORITY' },
-      { id: 'nl5', company: 'FinTech Corp', value: '$18,200', tag: 'LOW PRIORITY' },
-    ],
-    contacted: [
-      { id: 'c1', company: 'Stark Industries CRM', value: '$85,000', tag: 'FOLLOW-UP' },
-      { id: 'c2', company: 'SolarEnergy Systems', value: '$62,000', tag: 'HIGH PRIORITY' },
-      { id: 'c3', company: 'RetailLink', value: '$9,500', tag: 'LOW PRIORITY' },
-      { id: 'c4', company: 'GreenLogistics', value: '$34,000', tag: 'MEDIUM PRIORITY' },
-    ],
-    negotiation: [
-      { id: 'n1', company: 'Wayne Enterprises SaaS', value: '$120,000', tag: 'REVIEW' },
-      { id: 'n2', company: 'BlueSky Media', value: '$210,000', tag: 'HIGH PRIORITY' },
-      { id: 'n3', company: 'Quantum Leap', value: '$42,000', tag: 'MEDIUM PRIORITY' },
-      { id: 'n4', company: 'Pioneer Labs', value: '$15,000', tag: 'LOW PRIORITY' },
-    ],
-    closedLost: [
-      { id: 'cl1', company: 'CloudNine Inc', value: '$88,000', tag: 'WON' },
-      { id: 'cl2', company: 'Cyberdyne Systems', value: '$30,000', tag: 'LOST' },
-      { id: 'cl3', company: 'Ironworks', value: '$12,000', tag: 'WON' },
-      { id: 'cl4', company: 'Swift Delivery', value: '$5,000', tag: 'LOST' },
-    ]
-  });
+  const handleAddDeal = async (e) => {
+    e.preventDefault();
+    const stageMapping = {
+      'newLead': 1,
+      'contacted': 2,
+      'negotiation': 3,
+      'closedLost': 4
+    };
+    try {
+      await createDeal({
+        title: newDealTitle,
+        deal_value: newDealValue,
+        priority: newDealPriority,
+        stage_id: stageMapping[isAdding] || 1
+      });
+      setIsAdding(null);
+      setNewDealTitle('');
+      setNewDealValue('');
+      setNewDealPriority('medium');
+      loadData();
+    } catch (err) {
+      console.error('Add deal error:', err);
+    }
+  };
 
   const checkTrashProximity = (info) => {
     const trashBin = document.getElementById('trash-bin');
@@ -70,13 +139,19 @@ const MyPipeline = () => {
     }
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (itemToDelete) {
-      setLists(prev => ({
-        ...prev,
-        [itemToDelete.listKey]: prev[itemToDelete.listKey].filter(c => c.id !== itemToDelete.id)
-      }));
-      setItemToDelete(null);
+      try {
+        await deleteDeal(itemToDelete.id);
+        setLists(prev => ({
+          ...prev,
+          [itemToDelete.listKey]: prev[itemToDelete.listKey].filter(c => c.id !== itemToDelete.id)
+        }));
+        setItemToDelete(null);
+      } catch (err) {
+        console.error('Failed to delete deal:', err);
+        alert('Failed to delete lead from server.');
+      }
     }
   };
 
@@ -121,97 +196,108 @@ const MyPipeline = () => {
       </div>
     </motion.div>
   );
-const currentUser=getCurrentUser();
+
   return (
-    
-    <DashboardLayout 
-    
-      role={currentUser?.role}
-      userName={user?.fullName || "Sales Representative"} 
-      userRole={user?.role?.replace('_', ' ') || "Representative"}
-    >
-      <div className="relative z-10 min-h-0">
+    <>
+    <div className="relative z-10 min-h-0">
         <h2 className="text-[11px] text-[#5a827d] font-extrabold uppercase tracking-widest mb-6 px-1">Deal Pipeline</h2>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 items-start relative z-10">
-          
-          {/* Column: New Lead */}
-          <div className="bg-[#f0f7f6] rounded-3xl p-5 border border-teal-50 min-h-[150px]">
-            <div className="flex justify-between items-center mb-5 px-1">
-              <div className="flex items-center gap-2.5">
-                <div className="w-2 h-2 rounded-full bg-slate-400"></div>
-                <span className="font-extrabold text-[#0e4d46] text-sm">New Lead</span>
-                <span className="bg-slate-200 text-slate-500 text-[10px] font-bold px-2 py-0.5 rounded-md min-w-[24px] text-center transition-all">
-                  {lists.newLead.length}
-                </span>
-              </div>
-              <button className="text-slate-400 font-bold hover:text-slate-600 tracking-widest leading-none">...</button>
-            </div>
-            <div className="space-y-3 relative">
-              <AnimatePresence>
-                {lists.newLead.map(card => renderCard(card, 'newLead'))}
-              </AnimatePresence>
-            </div>
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-20 gap-4">
+            <div className="w-12 h-12 border-4 border-teal-100 border-t-[#0e4d46] rounded-full animate-spin"></div>
+            <p className="text-slate-500 font-bold animate-pulse">Syncing pipeline data...</p>
           </div>
-
-          {/* Column: Contacted */}
-          <div className="bg-[#f0f7f6] rounded-3xl p-5 border border-teal-50 min-h-[150px]">
-            <div className="flex justify-between items-center mb-5 px-1">
-              <div className="flex items-center gap-2.5">
-                <div className="w-2 h-2 rounded-full bg-blue-400"></div>
-                <span className="font-extrabold text-[#0e4d46] text-sm">Contacted</span>
-                <span className="bg-slate-200 text-slate-500 text-[10px] font-bold px-2 py-0.5 rounded-md min-w-[24px] text-center transition-all">
-                  {lists.contacted.length}
-                </span>
-              </div>
-              <button className="text-slate-400 font-bold hover:text-slate-600 tracking-widest leading-none">...</button>
-            </div>
-            <div className="space-y-3 relative">
-              <AnimatePresence>
-                {lists.contacted.map(card => renderCard(card, 'contacted'))}
-              </AnimatePresence>
-            </div>
+        ) : error ? (
+          <div className="bg-red-50 p-10 rounded-3xl border border-red-100 text-center">
+            <p className="text-red-600 font-bold mb-4">{error}</p>
+            <button 
+              onClick={() => window.location.reload()}
+              className="bg-red-500 text-white px-6 py-2 rounded-xl font-bold text-sm hover:bg-red-600 transition-colors"
+            >
+              Retry
+            </button>
           </div>
-
-          {/* Column: Negotiation */}
-          <div className="bg-[#f0f7f6] rounded-3xl p-5 border border-teal-50 min-h-[150px]">
-            <div className="flex justify-between items-center mb-5 px-1">
-              <div className="flex items-center gap-2.5">
-                <div className="w-2 h-2 rounded-full bg-yellow-400"></div>
-                <span className="font-extrabold text-[#0e4d46] text-sm">Negotiation</span>
-                <span className="bg-slate-200 text-slate-500 text-[10px] font-bold px-2 py-0.5 rounded-md min-w-[24px] text-center transition-all">
-                  {lists.negotiation.length}
-                </span>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 items-start relative z-10">
+            
+            {/* Column: New Lead */}
+            <div className="bg-[#f0f7f6] rounded-3xl p-5 border border-teal-50 min-h-[150px]">
+              <div className="flex justify-between items-center mb-5 px-1">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-2 h-2 rounded-full bg-slate-400"></div>
+                  <span className="font-extrabold text-[#0e4d46] text-sm">New Lead</span>
+                  <span className="bg-slate-200 text-slate-500 text-[10px] font-bold px-2 py-0.5 rounded-md min-w-[24px] text-center transition-all">
+                    {lists.newLead.length}
+                  </span>
+                </div>
+                <button onClick={() => setIsAdding('newLead')} className="text-slate-400 font-bold hover:text-slate-600 tracking-widest leading-none">...</button>
               </div>
-              <button className="text-slate-400 font-bold hover:text-slate-600 tracking-widest leading-none">...</button>
-            </div>
-            <div className="space-y-3 relative">
-              <AnimatePresence>
-                  {lists.negotiation.map(card => renderCard(card, 'negotiation'))}
-              </AnimatePresence>
-            </div>
-          </div>
-
-          {/* Column: Closed / Lost */}
-          <div className="bg-[#f0f7f6] rounded-3xl p-5 border border-teal-50 min-h-[150px]">
-            <div className="flex justify-between items-center mb-5 px-1">
-              <div className="flex items-center gap-2.5">
-                <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
-                <span className="font-extrabold text-[#0e4d46] text-sm">Closed / Lost</span>
-                <span className="bg-slate-200 text-slate-500 text-[10px] font-bold px-2 py-0.5 rounded-md min-w-[24px] text-center transition-all">
-                  {lists.closedLost.length}
-                </span>
+              <div className="space-y-3 relative">
+                <AnimatePresence>
+                  {lists.newLead.map(card => renderCard(card, 'newLead'))}
+                </AnimatePresence>
               </div>
-              <button className="text-slate-400 font-bold hover:text-slate-600 tracking-widest leading-none">...</button>
             </div>
-            <div className="space-y-3 relative">
-              <AnimatePresence>
-                {lists.closedLost.map(card => renderCard(card, 'closedLost'))}
-              </AnimatePresence>
-            </div>
-          </div>
 
-        </div>
+            {/* Column: Contacted */}
+            <div className="bg-[#f0f7f6] rounded-3xl p-5 border border-teal-50 min-h-[150px]">
+              <div className="flex justify-between items-center mb-5 px-1">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-2 h-2 rounded-full bg-blue-400"></div>
+                  <span className="font-extrabold text-[#0e4d46] text-sm">Contacted</span>
+                  <span className="bg-slate-200 text-slate-500 text-[10px] font-bold px-2 py-0.5 rounded-md min-w-[24px] text-center transition-all">
+                    {lists.contacted.length}
+                  </span>
+                </div>
+                <button onClick={() => setIsAdding('contacted')} className="text-slate-400 font-bold hover:text-slate-600 tracking-widest leading-none">...</button>
+              </div>
+              <div className="space-y-3 relative">
+                <AnimatePresence>
+                  {lists.contacted.map(card => renderCard(card, 'contacted'))}
+                </AnimatePresence>
+              </div>
+            </div>
+
+            {/* Column: Negotiation */}
+            <div className="bg-[#f0f7f6] rounded-3xl p-5 border border-teal-50 min-h-[150px]">
+              <div className="flex justify-between items-center mb-5 px-1">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-2 h-2 rounded-full bg-yellow-400"></div>
+                  <span className="font-extrabold text-[#0e4d46] text-sm">Negotiation</span>
+                  <span className="bg-slate-200 text-slate-500 text-[10px] font-bold px-2 py-0.5 rounded-md min-w-[24px] text-center transition-all">
+                    {lists.negotiation.length}
+                  </span>
+                </div>
+                <button onClick={() => setIsAdding('negotiation')} className="text-slate-400 font-bold hover:text-slate-600 tracking-widest leading-none">...</button>
+              </div>
+              <div className="space-y-3 relative">
+                <AnimatePresence>
+                    {lists.negotiation.map(card => renderCard(card, 'negotiation'))}
+                </AnimatePresence>
+              </div>
+            </div>
+
+            {/* Column: Closed / Lost */}
+            <div className="bg-[#f0f7f6] rounded-3xl p-5 border border-teal-50 min-h-[150px]">
+              <div className="flex justify-between items-center mb-5 px-1">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
+                  <span className="font-extrabold text-[#0e4d46] text-sm">Closed / Lost</span>
+                  <span className="bg-slate-200 text-slate-500 text-[10px] font-bold px-2 py-0.5 rounded-md min-w-[24px] text-center transition-all">
+                    {lists.closedLost.length}
+                  </span>
+                </div>
+                <button onClick={() => setIsAdding('closedLost')} className="text-slate-400 font-bold hover:text-slate-600 tracking-widest leading-none">...</button>
+              </div>
+              <div className="space-y-3 relative">
+                <AnimatePresence>
+                  {lists.closedLost.map(card => renderCard(card, 'closedLost'))}
+                </AnimatePresence>
+              </div>
+            </div>
+
+          </div>
+        )}
       </div>
       
       {/* Trash Bin */}
@@ -279,7 +365,43 @@ const currentUser=getCurrentUser();
           </div>
         )}
       </AnimatePresence>
-    </DashboardLayout>
+
+      {/* Add Lead Modal (Mirroring Delete Modal Style) */}
+      <AnimatePresence>
+        {isAdding && (
+          <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsAdding(null)} className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" />
+            <motion.div initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 20 }} className="relative bg-white rounded-3xl p-8 shadow-2xl max-w-sm w-full border border-gray-100">
+              <h3 className="text-xl font-extrabold text-[#0e4d46] mb-6">Add New Lead</h3>
+              <form onSubmit={handleAddDeal} className="space-y-4">
+                <input 
+                  autoFocus required placeholder="Company Name" 
+                  className="w-full px-4 py-3 bg-[#f8fafb] rounded-xl border border-gray-100 font-bold text-sm"
+                  value={newDealTitle} onChange={e => setNewDealTitle(e.target.value)}
+                />
+                <input 
+                  required type="number" placeholder="Deal Value ($)" 
+                  className="w-full px-4 py-3 bg-[#f8fafb] rounded-xl border border-gray-100 font-bold text-sm"
+                  value={newDealValue} onChange={e => setNewDealValue(e.target.value)}
+                />
+                <select 
+                  className="w-full px-4 py-3 bg-[#f8fafb] rounded-xl border border-gray-100 font-bold text-sm appearance-none"
+                  value={newDealPriority} onChange={e => setNewDealPriority(e.target.value)}
+                >
+                  <option value="high">High Priority</option>
+                  <option value="medium">Medium Priority</option>
+                  <option value="low">Low Priority</option>
+                </select>
+                <div className="flex gap-3 pt-4">
+                  <button type="button" onClick={() => setIsAdding(null)} className="flex-1 py-3 px-4 rounded-xl border border-gray-200 font-bold text-sm text-slate-600">Cancel</button>
+                  <button type="submit" className="flex-1 py-3 px-4 rounded-xl bg-[#0e4d46] text-white font-bold text-sm shadow-lg shadow-teal-900/10">Add</button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+    </>
   );
 };
 

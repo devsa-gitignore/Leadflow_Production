@@ -26,9 +26,11 @@ export const signup = async (userData) => {
             role_name: roleMapping[userData.role] || userData.role
         });
 
-        const { user } = response.data;
-        // Store non-sensitive user data locally for UI
+        const { user, access, refresh } = response.data;
+        // Store user and tokens locally
         localStorage.setItem(USER_KEY, JSON.stringify(user));
+        if (access) localStorage.setItem('access', access);
+        if (refresh) localStorage.setItem('refresh', refresh);
         return user;
     } catch (error) {
         const message = error.response?.data?.errors?.non_field_errors?.[0] || 
@@ -55,9 +57,11 @@ export const login = async (email, password, role) => {
             role_name: roleMapping[role] || role
         });
 
-        const { user } = response.data;
-        // Store non-sensitive user data locally for UI
+        const { user, access, refresh } = response.data;
+        // Store user and tokens locally
         localStorage.setItem(USER_KEY, JSON.stringify(user));
+        if (access) localStorage.setItem('access', access);
+        if (refresh) localStorage.setItem('refresh', refresh);
         return user;
     } catch (error) {
         const message = error.response?.data?.errors?.non_field_errors?.[0] || 
@@ -86,6 +90,8 @@ export const logout = async () => {
         console.error('Logout error', error);
     } finally {
         localStorage.removeItem(USER_KEY);
+        localStorage.removeItem('access');
+        localStorage.removeItem('refresh');
         // Clear old legacy keys if they exist
         localStorage.removeItem('leadflow_session');
         localStorage.removeItem('role');

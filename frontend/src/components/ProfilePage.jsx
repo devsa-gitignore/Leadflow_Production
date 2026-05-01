@@ -267,15 +267,9 @@ const ProfilePage = () => {
   );
 
   return (
-    <DashboardLayout 
-      role={user?.role || "sales_manager"}
-      userName={user?.fullName || "Amisha Patel"} 
-      userRole={user?.role?.replace('_', ' ') || "Sales Manager"}
-    >
-      <div className="max-w-6xl mx-auto pb-12">
+    <div className="max-w-6xl mx-auto pb-12">
         {isEditing ? renderEditProfile() : renderProfileView()}
-      </div>
-    </DashboardLayout>
+    </div>
   );
 };
 

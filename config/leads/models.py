@@ -166,8 +166,15 @@ class PipelineStage(models.Model):
 class Deal(models.Model):
     lead = models.ForeignKey(Lead, on_delete=models.CASCADE)
 
+    PRIORITY_CHOICES = [
+        ('high', 'High Priority'),
+        ('medium', 'Medium Priority'),
+        ('low', 'Low Priority'),
+    ]
+
     title = models.CharField(max_length=255)
     deal_value = models.DecimalField(max_digits=12, decimal_places=2)
+    priority = models.CharField(max_length=20, choices=PRIORITY_CHOICES, default='medium')
 
     stage = models.ForeignKey(PipelineStage, on_delete=models.SET_NULL, null=True)
 

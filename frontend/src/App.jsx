@@ -16,9 +16,13 @@ import ProfilePage from './components/ProfilePage';
 import { getCurrentUser } from './utils/auth';
 import { ProtectedRoute, PublicRoute } from './components/AuthGuards';
 
+import LayoutWrapper from './components/LayoutWrapper';
+
 const DashboardRouter = () => {
   const user = getCurrentUser();
-  return user?.role === 'sales_manager' ? <ManagerDash /> : <RepDash />;
+  // Handle both backend string "Sales Manager" and potential slug "sales_manager"
+  const isManager = user?.role === 'Sales Manager' || user?.role === 'sales_manager';
+  return isManager ? <ManagerDash /> : <RepDash />;
 };
 
 
@@ -34,15 +38,17 @@ function App() {
           <Route path="/signup" element={<PublicRoute><Signup /></PublicRoute>} />
           
           {/* Protected routes (redirect to login if not logged in) */}
-          <Route path="/dashboard" element={<ProtectedRoute><DashboardRouter /></ProtectedRoute>} />
-          <Route path="/team-overview" element={<ProtectedRoute><TeamOverview /></ProtectedRoute>} />
-          <Route path="/mypipeline" element={<ProtectedRoute><MyPipeline /></ProtectedRoute>}/>
-          <Route path="/Invoices" element={<ProtectedRoute><Invoices /></ProtectedRoute>}/>
-          <Route path="/Reports" element={<ProtectedRoute><Reports /></ProtectedRoute>}/>
-          <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
-          <Route path="/calendar" element={<ProtectedRoute><CalendarPage /></ProtectedRoute>}/>
-          <Route path="/todo" element={<ProtectedRoute><TodoPage /></ProtectedRoute>}/>
-          <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>}/>
+          <Route element={<ProtectedRoute><LayoutWrapper /></ProtectedRoute>}>
+            <Route path="/dashboard" element={<DashboardRouter />} />
+            <Route path="/team-overview" element={<TeamOverview />} />
+            <Route path="/mypipeline" element={<MyPipeline />}/>
+            <Route path="/invoices" element={<Invoices />}/>
+            <Route path="/reports" element={<Reports />}/>
+            <Route path="/settings" element={<Settings />} />
+            <Route path="/calendar" element={<CalendarPage />}/>
+            <Route path="/todo" element={<TodoPage />}/>
+            <Route path="/profile" element={<ProfilePage />}/>
+          </Route>
 
           {/* Legacy redirects */}
           <Route path="/rep-dash" element={<Navigate to="/dashboard" replace />} />

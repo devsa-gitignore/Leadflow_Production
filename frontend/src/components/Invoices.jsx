@@ -96,12 +96,7 @@ const Invoices = () => {
   };
 
   return (
-    <DashboardLayout 
-      role="sales_rep"
-      userName={user?.fullName || "Arjun Raval"} 
-      userRole={user?.role?.replace('_', ' ') || "Representative"}
-    >
-      <div className="relative z-10 w-full">
+    <div className="relative z-10 w-full">
         
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6 mb-8">
           {metrics.map((kpi, idx) => (
@@ -284,8 +279,6 @@ const Invoices = () => {
 
         </div>
 
-      </div>
-
       <button className="fixed bottom-6 right-6 md:bottom-10 md:right-10 flex items-center justify-center gap-2.5 bg-[#0e4d46] text-white px-5 md:px-7 py-3 md:py-4 rounded-[1.2rem] shadow-[0_8px_30px_rgb(14,77,70,0.3)] hover:-translate-y-1 hover:shadow-[0_12px_40px_rgb(14,77,70,0.4)] transition-all font-extrabold text-[10px] md:text-xs tracking-wide uppercase z-50">
         <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
@@ -294,7 +287,7 @@ const Invoices = () => {
         <span className="xs:hidden">Generate</span>
       </button>
 
-    </DashboardLayout>
+    </div>
   );
 };
 

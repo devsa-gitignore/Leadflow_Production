@@ -64,7 +64,13 @@ def signup(request):
                     result['user']['email'], result['user']['role'])
         
         response = Response(
-            {"success": True, "message": "Account created successfully.", "user": result['user']},
+            {
+                "success": True, 
+                "message": "Account created successfully.", 
+                "user": result['user'],
+                "access": result['access'],
+                "refresh": result['refresh']
+            },
             status=status.HTTP_201_CREATED,
         )
         
@@ -134,7 +140,13 @@ def login(request):
                 result['user']['email'], result['user']['role'])
     
     response = Response(
-        {"success": True, "message": "Login successful.", "user": result['user']},
+        {
+            "success": True, 
+            "message": "Login successful.", 
+            "user": result['user'],
+            "access": result['access'],
+            "refresh": result['refresh']
+        },
         status=status.HTTP_200_OK,
     )
     

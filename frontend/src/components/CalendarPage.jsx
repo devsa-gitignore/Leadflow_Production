@@ -14,15 +14,9 @@ const CalendarPage = () => {
   }, []);
 
   return (
-    <DashboardLayout 
-      role={user?.role || "sales_rep"}
-      userName={user?.fullName || "User"} 
-      userRole={user?.role?.replace('_', ' ') || "Representative"}
-    >
       <div className="w-full">
         <Calendar variant="full" />
       </div>
-    </DashboardLayout>
   );
 };
 

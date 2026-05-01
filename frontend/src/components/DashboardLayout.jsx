@@ -1,10 +1,13 @@
 import React, { useState } from 'react';
+import { Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import Navbar2 from './Navbar2';
 
-const DashboardLayout = ({ children, role, userName, userRole }) => {
+const DashboardLayout = ({ role, userName, userRole }) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  
   if(!role) return null;
+  
   return (
     <div className="flex h-screen bg-[#e8f3f1] overflow-hidden relative font-sans">
       {/* Sidebar Overlay for mobile */}
@@ -33,7 +36,7 @@ const DashboardLayout = ({ children, role, userName, userRole }) => {
             toggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
           />
           <div className="animate-in fade-in duration-500">
-            {children}
+            <Outlet />
           </div>
         </main>
       </div>

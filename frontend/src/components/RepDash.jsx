@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import Calendar from './Calendar';
 import Todo from './Todo';
-import DashboardLayout from './DashboardLayout';
 import { getCurrentUser } from '../utils/auth';
+import useDashboardData from '../hooks/useDashboardData';
 
 const AnimatedNumber = ({ value, prefix = '', suffix = '', isCurrency = false, duration = 1000 }) => {
   const [current, setCurrent] = useState(0);
@@ -37,6 +37,7 @@ const AnimatedNumber = ({ value, prefix = '', suffix = '', isCurrency = false, d
 };
 
 const RepDash = () => {
+  const { data, loading, error } = useDashboardData();
   const [user, setUser] = useState(null);
 
   useEffect(() => {
@@ -46,25 +47,33 @@ const RepDash = () => {
     }
   }, []);
 
-  const stats = [
-    { label: 'LEADS ASSIGNED TODAY', value: 14, prefix: '', suffix: '', trend: '+5%', positive: true },
-    { label: 'MY PIPELINE VALUE', value: 52, prefix: '$', suffix: 'k', trend: '+8%', positive: true },
-    { label: 'PERSONAL CONVERSION', value: 28, prefix: '', suffix: '%', trend: '-2%', positive: false },
-    { label: 'PENDING FOLLOW-UPS', value: 9, prefix: '0', suffix: '', trend: '+1%', positive: true },
-  ];
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-[60vh]">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 border-4 border-[#0e4d46]/20 border-t-[#0e4d46] rounded-full animate-spin"></div>
+          <p className="text-[#5a827d] font-bold text-sm">Loading your metrics...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-red-50 p-8 rounded-3xl border border-red-100 text-center">
+        <p className="text-red-600 font-bold mb-2">Failed to load dashboard data</p>
+        <p className="text-red-400 text-sm">{error}</p>
+      </div>
+    );
+  }
+
+  const stats = data?.stats || [];
+  const activeLeads = data?.activeLeads || [];
 
   const initialTodoItems = [
     { id: 1, task: 'Follow up with Rahul regarding Q4 contract', due: 'Today, 2:00 PM', priority: 'High', completed: true },
     { id: 2, task: 'Prepare demo for Sonia Gupta', due: 'Oct 10, 11:00 AM', priority: 'Medium', completed: false },
     { id: 3, task: 'Update pipeline status for Amit Singh', due: 'Oct 11, 4:00 PM', priority: 'Low', completed: false },
-  ];
-
-  const activeLeads = [
-    { name: 'Rahul Mehta', status: 'New', lastContact: '2 hours ago' },
-    { name: 'Sonia Gupta', status: 'Qualified', lastContact: 'Yesterday' },
-    { name: 'Amit Singh', status: 'Follow-up', lastContact: '2 days ago' },
-    { name: 'Priya Rai', status: 'Negotiation', lastContact: '5 hours ago' },
-    { name: 'Vikram Seth', status: 'Initial Contact', lastContact: 'Just Now' },
   ];
 
   const meetings = [
@@ -73,12 +82,7 @@ const RepDash = () => {
   ];
 
   return (
-    <DashboardLayout 
-      role={user?.role}
-      userName={user?.fullName || "Sales Representative"} 
-      userRole={user?.role?.replace('_', ' ') || "Representative"}
-    >
-      <div className="flex flex-col xl:flex-row gap-8">
+    <div className="flex flex-col xl:flex-row gap-8">
         {/* Left Column */}
         <div className="flex-1 space-y-8 min-w-0">
           {/* Stats Grid */}
@@ -206,7 +210,6 @@ const RepDash = () => {
           <Calendar variant="mini" />
         </div>
       </div>
-    </DashboardLayout>
   );
 };
 

@@ -225,12 +225,7 @@ const Reports = () => {
   };
 
   return (
-    <DashboardLayout 
-      role="sales_manager"
-      userName={user?.fullName || "Arjun Raval"} 
-      userRole={user?.role?.replace('_', ' ') || "Sales Manager"}
-    >
-      <div className="relative z-10 w-full">
+    <div className="relative z-10 w-full">
         
         {/* Top Global Controls */}
         <div className="flex flex-col sm:flex-row justify-end items-stretch sm:items-center gap-4 mb-8">
@@ -492,7 +487,6 @@ const Reports = () => {
         </div>
 
       </div>
-    </DashboardLayout>
   );
 };
 

@@ -11,6 +11,7 @@ class DealSerializer(serializers.ModelSerializer):
             'id',
             'title',
             'deal_value',
+            'priority',
             'stage',
             'lead_name',
             'company',
