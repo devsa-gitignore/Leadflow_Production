@@ -1,32 +1,60 @@
-import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState, useEffect, useRef } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { searchDeals } from '../services/pipelineService';
 
 const Navbar2 = ({ userName, userRole, profileImage, placeholder, toggleSidebar }) => {
   const [searchQuery, setSearchQuery] = useState('');
+  const [recommendations, setRecommendations] = useState([]);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const dropdownRef = useRef(null);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const fetchRecommendations = async () => {
+      if (searchQuery.length > 0) {
+        try {
+          const results = await searchDeals(searchQuery);
+          setRecommendations(results);
+          setShowDropdown(true);
+        } catch (error) {
+          console.error('Search error:', error);
+        }
+      } else {
+        setRecommendations([]);
+        setShowDropdown(false);
+      }
+    };
+
+    const timeoutId = setTimeout(fetchRecommendations, 300);
+    return () => clearTimeout(timeoutId);
+  }, [searchQuery]);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setShowDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const handleSearch = (e) => {
     e.preventDefault();
     if (!searchQuery.trim()) return;
+    setShowDropdown(false);
+    navigate(`/mypipeline?q=${encodeURIComponent(searchQuery)}`);
+  };
 
-    // Standard "Find on Page" functionalitity
-    // This will find the text and scroll to it automatically
-    const found = window.find(searchQuery, false, false, true, false, true, false);
-    
-    if (!found) {
-      // If not found from current position, search from the beginning
-      // We reset the selection by collapsing it
-      window.getSelection().collapse(document.body, 0);
-      const foundFromStart = window.find(searchQuery, false, false, true, false, true, false);
-      if (!foundFromStart) {
-        console.log('Text not found on page');
-      }
-    }
+  const handleSelectRecommendation = (deal) => {
+    setSearchQuery(deal.company || deal.title);
+    setShowDropdown(false);
+    navigate(`/mypipeline?q=${encodeURIComponent(deal.company || deal.title)}`);
   };
 
   return (
-    <header className="flex flex-col sm:flex-row justify-between items-center mb-8 gap-6">
+    <header className="flex flex-col sm:flex-row justify-between items-center mb-8 gap-6 relative z-[100]">
       <div className="flex items-center justify-between w-full sm:w-auto gap-4">
-        {/* Mobile Toggle Button */}
         <button 
           onClick={toggleSidebar}
           className="lg:hidden p-2 text-[#0e4d46] bg-white rounded-xl border border-gray-100 shadow-sm"
@@ -36,20 +64,41 @@ const Navbar2 = ({ userName, userRole, profileImage, placeholder, toggleSidebar 
           </svg>
         </button>
 
-        <form onSubmit={handleSearch} className="relative flex-1 sm:w-80 md:w-96">
-          <input 
-            type="text" 
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder={placeholder || "Search leads..."} 
-            className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white border border-gray-100 focus:outline-none focus:ring-2 focus:ring-[#0e4d46]/10 text-sm shadow-sm"
-          />
-          <button type="submit" className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-[#0e4d46] transition-colors">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-          </button>
-        </form>
+        <div className="relative flex-1 sm:w-80 md:w-96" ref={dropdownRef}>
+          <form onSubmit={handleSearch} className="relative">
+            <input 
+              type="text" 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onFocus={() => searchQuery.length > 0 && setShowDropdown(true)}
+              placeholder={placeholder || "Search leads..."} 
+              className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white border border-gray-100 focus:outline-none focus:ring-2 focus:ring-[#0e4d46]/10 text-sm shadow-sm"
+            />
+            <button type="submit" className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-[#0e4d46] transition-colors">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </button>
+          </form>
+
+          {showDropdown && recommendations.length > 0 && (
+            <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden z-[200]">
+              {recommendations.map((deal) => (
+                <button
+                  key={deal.id}
+                  onClick={() => handleSelectRecommendation(deal)}
+                  className="w-full px-4 py-3 text-left hover:bg-gray-50 flex items-center justify-between border-b border-gray-50 last:border-0"
+                >
+                  <div className="flex flex-col">
+                    <span className="text-sm font-bold text-[#0e4d46]">{deal.company || deal.title}</span>
+                    <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">{deal.stage_name || 'Active Deal'}</span>
+                  </div>
+                  <span className="text-xs font-bold text-teal-600 bg-teal-50 px-2 py-1 rounded-md">${parseFloat(deal.deal_value).toLocaleString()}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="flex items-center gap-6">

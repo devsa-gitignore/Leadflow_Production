@@ -1,9 +1,13 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getCurrentUser } from '../utils/auth';
 import { fetchPipelineData, deleteDeal, createDeal } from '../services/pipelineService';
 
 const MyPipeline = () => {
+  const [searchParams] = useSearchParams();
+  const searchQuery = searchParams.get('q') || '';
+
   const [user, setUser] = useState(null);
   const [isOverTrash, setIsOverTrash] = useState(false);
   const [itemToDelete, setItemToDelete] = useState(null);
@@ -21,6 +25,7 @@ const MyPipeline = () => {
   const [newDealTitle, setNewDealTitle] = useState('');
   const [newDealValue, setNewDealValue] = useState('');
   const [newDealPriority, setNewDealPriority] = useState('medium');
+  const [newDealResult, setNewDealResult] = useState(''); // New state
 
   const loadData = async () => {
     try {
@@ -34,36 +39,53 @@ const MyPipeline = () => {
         closedLost: []
       };
 
+      const filterDeals = (deals) => {
+        if (!searchQuery) return deals;
+        return deals.filter(d => 
+          d.company?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          d.title?.toLowerCase().includes(searchQuery.toLowerCase())
+        );
+      };
+
       data.pipeline.forEach(stage => {
         const deals = stage.deals.map(deal => ({
           id: deal.id,
+          title: deal.title,
           company: deal.company || deal.title,
           value: `$${parseFloat(deal.deal_value).toLocaleString()}`,
-          tag: (deal.priority || 'medium').toUpperCase() + ' PRIORITY'
+          tag: deal.result ? deal.result : (deal.priority || 'medium').toUpperCase() + ' PRIORITY',
+          result: deal.result
         }));
 
-        if (stage.stage_name === 'Discovery') newLists.newLead = deals;
-        else if (stage.stage_name === 'Proposal') newLists.contacted = deals;
-        else if (stage.stage_name === 'Negotiation') newLists.negotiation = deals;
-        else if (stage.stage_name === 'Closed') newLists.closedLost = [...newLists.closedLost, ...deals];
+        const filtered = filterDeals(deals);
+
+        if (stage.stage_name === 'Discovery') newLists.newLead = filtered;
+        else if (stage.stage_name === 'Proposal') newLists.contacted = filtered;
+        else if (stage.stage_name === 'Negotiation') newLists.negotiation = filtered;
+        else if (stage.stage_name === 'Closed') newLists.closedLost = [...newLists.closedLost, ...filtered];
         else {
-          if (newLists.newLead.length === 0) newLists.newLead = deals;
+          if (newLists.newLead.length === 0) newLists.newLead = filtered;
         }
       });
 
       const closed = data.closed_deals.map(deal => ({
         id: deal.id,
+        title: deal.title,
         company: deal.company || deal.title,
         value: `$${parseFloat(deal.deal_value).toLocaleString()}`,
-        tag: 'WON'
+        tag: 'WON',
+        result: 'WON'
       }));
       const lost = data.lost_deals.map(deal => ({
         id: deal.id,
+        title: deal.title,
         company: deal.company || deal.title,
         value: `$${parseFloat(deal.deal_value).toLocaleString()}`,
-        tag: 'LOST'
+        tag: 'LOST',
+        result: 'LOST'
       }));
-      newLists.closedLost = [...newLists.closedLost, ...closed, ...lost];
+
+      newLists.closedLost = [...newLists.closedLost, ...filterDeals(closed), ...filterDeals(lost)];
 
       setLists(newLists);
       setError(null);
@@ -85,30 +107,41 @@ const MyPipeline = () => {
       setUser(currentUser);
     }
     loadData();
-  }, []);
+  }, [searchQuery]); // Reload when search query changes
 
   const handleAddDeal = async (e) => {
     e.preventDefault();
-    const stageMapping = {
-      'newLead': 1,
-      'contacted': 2,
-      'negotiation': 3,
-      'closedLost': 4
-    };
     try {
       await createDeal({
         title: newDealTitle,
-        deal_value: newDealValue,
+        deal_value: parseFloat(newDealValue) || 0,
         priority: newDealPriority,
-        stage_id: stageMapping[isAdding] || 1
+        result: newDealResult || null, // Send if selected
+        stage: 1
       });
-      setIsAdding(null);
       setNewDealTitle('');
       setNewDealValue('');
-      setNewDealPriority('medium');
+      setNewDealResult('');
+      setIsAdding(null);
       loadData();
     } catch (err) {
-      console.error('Add deal error:', err);
+      console.error('Failed to add deal:', err);
+      alert('Failed to add deal.');
+    }
+  };
+
+  const handleMarkStatus = async (dealId, result) => {
+    try {
+      await updateDeal(dealId, { 
+        result, 
+        is_won: result === 'WON', 
+        is_lost: result === 'LOST',
+        stage: 4 // Ensure it's moved to "Closed" stage in DB
+      });
+      loadData();
+    } catch (err) {
+      console.error('Failed to update deal status:', err);
+      alert('Failed to update deal status.');
     }
   };
 
@@ -188,11 +221,29 @@ const MyPipeline = () => {
       className="bg-white p-4 rounded-xl shadow-[0_2px_10px_rgb(0,0,0,0.02)] border border-gray-100 flex flex-col justify-between h-24 cursor-grab transition-shadow relative bg-clip-padding touch-none z-10"
     >
       <div className="font-extrabold text-[#0e4d46] text-sm truncate pointer-events-none">{card.company}</div>
-      <div className="flex justify-between items-end pointer-events-none">
-        <span className="text-slate-400 text-xs font-bold">{card.value}</span>
-        <span className={`text-[9px] font-extrabold tracking-widest uppercase ${getTagColor(card.tag)}`}>
-          {card.tag}
-        </span>
+      <div className="flex justify-between items-end">
+        <span className="text-slate-400 text-xs font-bold pointer-events-none">{card.value}</span>
+        
+        {listKey === 'closedLost' && !card.result ? (
+          <div className="flex gap-2">
+            <button 
+              onClick={(e) => { e.stopPropagation(); handleMarkStatus(card.id, 'WON'); }}
+              className="text-[8px] font-black bg-green-50 text-green-600 px-2 py-1 rounded-md border border-green-100 hover:bg-green-100 transition-colors cursor-pointer"
+            >
+              WON
+            </button>
+            <button 
+              onClick={(e) => { e.stopPropagation(); handleMarkStatus(card.id, 'LOST'); }}
+              className="text-[8px] font-black bg-red-50 text-red-500 px-2 py-1 rounded-md border border-red-100 hover:bg-red-100 transition-colors cursor-pointer"
+            >
+              LOST
+            </button>
+          </div>
+        ) : (
+          <span className={`text-[9px] font-extrabold tracking-widest uppercase pointer-events-none ${getTagColor(card.tag)}`}>
+            {card.tag}
+          </span>
+        )}
       </div>
     </motion.div>
   );
@@ -200,7 +251,20 @@ const MyPipeline = () => {
   return (
     <>
     <div className="relative z-10 min-h-0">
-        <h2 className="text-[11px] text-[#5a827d] font-extrabold uppercase tracking-widest mb-6 px-1">Deal Pipeline</h2>
+        <div className="flex justify-between items-center mb-6 px-1">
+          <h2 className="text-[11px] text-[#5a827d] font-extrabold uppercase tracking-widest">Deal Pipeline</h2>
+          {searchQuery && (
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">Showing results for: <span className="text-[#0e4d46]">"{searchQuery}"</span></span>
+              <button 
+                onClick={() => window.history.pushState({}, '', window.location.pathname)} 
+                className="text-[10px] font-extrabold text-teal-600 hover:text-teal-700"
+              >
+                Clear
+              </button>
+            </div>
+          )}
+        </div>
 
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20 gap-4">
@@ -233,9 +297,10 @@ const MyPipeline = () => {
                 <button onClick={() => setIsAdding('newLead')} className="text-slate-400 font-bold hover:text-slate-600 tracking-widest leading-none">...</button>
               </div>
               <div className="space-y-3 relative">
-                <AnimatePresence>
+                <AnimatePresence mode="popLayout">
                   {lists.newLead.map(card => renderCard(card, 'newLead'))}
                 </AnimatePresence>
+                {lists.newLead.length === 0 && searchQuery && <div className="py-4 text-center text-[10px] font-bold text-slate-300 uppercase tracking-widest">No matches</div>}
               </div>
             </div>
 
@@ -252,9 +317,10 @@ const MyPipeline = () => {
                 <button onClick={() => setIsAdding('contacted')} className="text-slate-400 font-bold hover:text-slate-600 tracking-widest leading-none">...</button>
               </div>
               <div className="space-y-3 relative">
-                <AnimatePresence>
+                <AnimatePresence mode="popLayout">
                   {lists.contacted.map(card => renderCard(card, 'contacted'))}
                 </AnimatePresence>
+                {lists.contacted.length === 0 && searchQuery && <div className="py-4 text-center text-[10px] font-bold text-slate-300 uppercase tracking-widest">No matches</div>}
               </div>
             </div>
 
@@ -271,9 +337,10 @@ const MyPipeline = () => {
                 <button onClick={() => setIsAdding('negotiation')} className="text-slate-400 font-bold hover:text-slate-600 tracking-widest leading-none">...</button>
               </div>
               <div className="space-y-3 relative">
-                <AnimatePresence>
+                <AnimatePresence mode="popLayout">
                     {lists.negotiation.map(card => renderCard(card, 'negotiation'))}
                 </AnimatePresence>
+                {lists.negotiation.length === 0 && searchQuery && <div className="py-4 text-center text-[10px] font-bold text-slate-300 uppercase tracking-widest">No matches</div>}
               </div>
             </div>
 
@@ -290,9 +357,10 @@ const MyPipeline = () => {
                 <button onClick={() => setIsAdding('closedLost')} className="text-slate-400 font-bold hover:text-slate-600 tracking-widest leading-none">...</button>
               </div>
               <div className="space-y-3 relative">
-                <AnimatePresence>
+                <AnimatePresence mode="popLayout">
                   {lists.closedLost.map(card => renderCard(card, 'closedLost'))}
                 </AnimatePresence>
+                {lists.closedLost.length === 0 && searchQuery && <div className="py-4 text-center text-[10px] font-bold text-slate-300 uppercase tracking-widest">No matches</div>}
               </div>
             </div>
 
@@ -391,6 +459,15 @@ const MyPipeline = () => {
                   <option value="high">High Priority</option>
                   <option value="medium">Medium Priority</option>
                   <option value="low">Low Priority</option>
+                </select>
+
+                <select 
+                  className="w-full px-4 py-3 bg-[#f8fafb] rounded-xl border border-gray-100 font-bold text-sm appearance-none"
+                  value={newDealResult} onChange={e => setNewDealResult(e.target.value)}
+                >
+                  <option value="">Select Result (Optional)</option>
+                  <option value="WON">WON</option>
+                  <option value="LOST">LOST</option>
                 </select>
                 <div className="flex gap-3 pt-4">
                   <button type="button" onClick={() => setIsAdding(null)} className="flex-1 py-3 px-4 rounded-xl border border-gray-200 font-bold text-sm text-slate-600">Cancel</button>

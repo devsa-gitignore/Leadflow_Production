@@ -1,37 +1,88 @@
 import React, { useState, useEffect } from 'react';
-import DashboardLayout from './DashboardLayout';
 import { getCurrentUser } from '../utils/auth';
+import { fetchInvoices, autoGenerateInvoices, updateInvoiceStatus } from '../services/invoiceService';
 
 const Invoices = () => {
   const [user, setUser] = useState(null);
+  const [allInvoices, setAllInvoices] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [generating, setGenerating] = useState(false);
+  const [error, setError] = useState(null);
+  const [openMenuId, setOpenMenuId] = useState(null); // Track which menu is open
+
+  const loadInvoices = async () => {
+    try {
+      setLoading(true);
+      const data = await fetchInvoices();
+      
+      // Robustly handle paginated (object) vs non-paginated (array) vs nested responses
+      let invoiceList = [];
+      if (Array.isArray(data)) {
+        invoiceList = data;
+      } else if (data && data.results && Array.isArray(data.results)) {
+        invoiceList = data.results;
+      } else if (data && data.invoices && Array.isArray(data.invoices)) {
+        invoiceList = data.invoices;
+      }
+
+      // Data Mapping Function
+      const mapped = invoiceList.map(inv => ({
+        id: inv.invoice_number || `INV-${inv.id}`,
+        dbId: inv.id, // Store DB id for API updates
+        client: inv.client_name || 'N/A',
+        date: new Date(inv.created_at).toLocaleDateString('en-US', {
+          month: 'short',
+          day: '2-digit',
+          year: 'numeric'
+        }),
+        amount: `$${parseFloat(inv.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
+        status: (inv.status || 'pending').toUpperCase(),
+        rawAmount: parseFloat(inv.amount)
+      }));
+
+      setAllInvoices(mapped);
+      setError(null);
+    } catch (err) {
+      console.error('Failed to load invoices:', err);
+      setError('Could not sync with financial server.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleStatusChange = async (invoiceDbId, newStatus) => {
+    try {
+      await updateInvoiceStatus(invoiceDbId, newStatus);
+      // Immediately re-fetch to update UI
+      loadInvoices();
+    } catch (error) {
+      console.error('Failed to update status:', error);
+      alert('Failed to update invoice status.');
+    }
+  };
+
+  const handleGenerateInvoices = async () => {
+    try {
+      setGenerating(true);
+      const res = await autoGenerateInvoices();
+      alert(res.message);
+      loadInvoices(); // Refresh the list
+    } catch (err) {
+      console.error('Generation failed:', err);
+      alert('Failed to generate invoices. Please ensure deals are marked as WON in the pipeline.');
+    } finally {
+
+      setGenerating(false);
+    }
+  };
 
   useEffect(() => {
     const currentUser = getCurrentUser();
     if (currentUser) {
       setUser(currentUser);
     }
+    loadInvoices();
   }, []);
-
-  // Mock Invoice List for Pagination
-  const allInvoices = [
-    { id: 'INV-001', client: 'Acme Corp', date: 'Oct 24, 2023', amount: '$12,000.00', status: 'PAID' },
-    { id: 'INV-002', client: 'Global Tech', date: 'Oct 26, 2023', amount: '$8,500.00', status: 'PENDING' },
-    { id: 'INV-003', client: 'Starlight Inc', date: 'Oct 20, 2023', amount: '$4,000.00', status: 'OVERDUE' },
-    { id: 'INV-004', client: 'Riverstone Ltd', date: 'Oct 28, 2023', amount: '$15,200.00', status: 'PAID' },
-    { id: 'INV-005', client: 'Nexus Solutions', date: 'Oct 30, 2023', amount: '$6,300.00', status: 'PENDING' },
-    { id: 'INV-006', client: 'Alpha Industries', date: 'Nov 01, 2023', amount: '$19,200.00', status: 'PAID' },
-    { id: 'INV-007', client: 'Beta Systems', date: 'Nov 02, 2023', amount: '$3,100.00', status: 'OVERDUE' },
-    { id: 'INV-008', client: 'Delta Corp', date: 'Nov 05, 2023', amount: '$18,500.00', status: 'PENDING' },
-    { id: 'INV-009', client: 'Omega Partners', date: 'Nov 06, 2023', amount: '$22,000.00', status: 'PAID' },
-    { id: 'INV-010', client: 'Sigma LLC', date: 'Nov 08, 2023', amount: '$5,400.00', status: 'PAID' },
-    { id: 'INV-011', client: 'Zeta Global', date: 'Nov 10, 2023', amount: '$11,700.00', status: 'PENDING' },
-    { id: 'INV-012', client: 'Epsilon Tech', date: 'Nov 12, 2023', amount: '$7,800.00', status: 'OVERDUE' },
-    { id: 'INV-013', client: 'TechWave', date: 'Nov 15, 2023', amount: '$14,300.00', status: 'PAID' },
-    { id: 'INV-014', client: 'Smart Solutions', date: 'Nov 18, 2023', amount: '$2,900.00', status: 'PENDING' },
-    { id: 'INV-015', client: 'NextGen Inc', date: 'Nov 20, 2023', amount: '$9,500.00', status: 'PAID' },
-    { id: 'INV-016', client: 'Pinnacle Data', date: 'Nov 22, 2023', amount: '$6,800.00', status: 'PAID' },
-    { id: 'INV-017', client: 'Nova Dynamics', date: 'Nov 24, 2023', amount: '$21,400.00', status: 'PENDING' },
-  ];
 
   // Logic State
   const [searchQuery, setSearchQuery] = useState('');
@@ -62,24 +113,40 @@ const Invoices = () => {
     currentPage * itemsPerPage
   );
 
-  const metrics = [
-    {
-      title: 'Total Invoiced', value: '$124,500.00', subtext: '+12% this month', subColor: 'text-emerald-500',
-      icon: <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
-    },
-    {
-      title: 'Pending Payments', value: '$32,400.00', subtext: '8 invoices pending', subColor: 'text-slate-400',
-      icon: <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-    },
-    {
-      title: 'Paid', value: '$88,100.00', subtext: '+18% from last month', subColor: 'text-emerald-500',
-      icon: <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-    },
-    {
-      title: 'Overdue', value: '$4,000.00', textColor: 'text-red-500', subtext: '3 invoices overdue', subColor: 'text-red-400',
-      icon: <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
-    }
-  ];
+  // Dynamic Metrics Calculation
+  const calculateMetrics = () => {
+    const total = allInvoices.reduce((sum, inv) => sum + inv.rawAmount, 0);
+    const pending = allInvoices.filter(inv => inv.status === 'PENDING')
+                               .reduce((sum, inv) => sum + inv.rawAmount, 0);
+    const paid = allInvoices.filter(inv => inv.status === 'PAID')
+                            .reduce((sum, inv) => sum + inv.rawAmount, 0);
+    const overdue = allInvoices.filter(inv => inv.status === 'OVERDUE')
+                               .reduce((sum, inv) => sum + inv.rawAmount, 0);
+    
+    const pendingCount = allInvoices.filter(inv => inv.status === 'PENDING').length;
+    const overdueCount = allInvoices.filter(inv => inv.status === 'OVERDUE').length;
+
+    return [
+      {
+        title: 'Total Invoiced', value: `$${total.toLocaleString()}`, subtext: 'Updated live', subColor: 'text-emerald-500',
+        icon: <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
+      },
+      {
+        title: 'Pending Payments', value: `$${pending.toLocaleString()}`, subtext: `${pendingCount} invoices pending`, subColor: 'text-slate-400',
+        icon: <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+      },
+      {
+        title: 'Paid', value: `$${paid.toLocaleString()}`, subtext: 'Successfully processed', subColor: 'text-emerald-500',
+        icon: <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+      },
+      {
+        title: 'Overdue', value: `$${overdue.toLocaleString()}`, textColor: 'text-red-500', subtext: `${overdueCount} invoices overdue`, subColor: 'text-red-400',
+        icon: <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+      }
+    ];
+  };
+
+  const metrics = calculateMetrics();
 
   const StatusBadge = ({ status }) => {
     const styles = {
@@ -213,12 +280,37 @@ const Invoices = () => {
                           <StatusBadge status={inv.status} />
                         </div>
                       </td>
-                      <td className="px-5 py-4 rounded-r-2xl text-center">
-                        <button className="p-2 text-slate-300 hover:text-[#0e4d46] transition-colors rounded-lg hover:bg-slate-50">
+                      <td className="px-5 py-4 rounded-r-2xl text-center relative">
+                        <button 
+                          onClick={() => setOpenMenuId(openMenuId === inv.id ? null : inv.id)}
+                          className="p-2 text-slate-300 hover:text-[#0e4d46] transition-colors rounded-lg hover:bg-slate-50"
+                        >
                           <svg className="w-5 h-5 mx-auto" fill="currentColor" viewBox="0 0 20 20">
                             <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
                           </svg>
                         </button>
+                        {openMenuId === inv.id && (
+                          <div className="absolute right-12 top-1/2 -translate-y-1/2 w-40 bg-white rounded-xl shadow-[0_10px_40px_rgb(0,0,0,0.1)] border border-teal-50 z-50 p-2 py-2">
+                            <button 
+                              onClick={() => { handleStatusChange(inv.dbId, 'PAID'); setOpenMenuId(null); }}
+                              className="w-full text-left px-3 py-2 text-xs font-bold text-[#5a827d] hover:bg-[#f0f7f6] hover:text-[#0e4d46] rounded-lg transition-colors"
+                            >
+                              Mark as PAID
+                            </button>
+                            <button 
+                              onClick={() => { handleStatusChange(inv.dbId, 'PENDING'); setOpenMenuId(null); }}
+                              className="w-full text-left px-3 py-2 text-xs font-bold text-[#5a827d] hover:bg-[#f0f7f6] hover:text-[#0e4d46] rounded-lg transition-colors"
+                            >
+                              Mark as PENDING
+                            </button>
+                            <button 
+                              onClick={() => { handleStatusChange(inv.dbId, 'OVERDUE'); setOpenMenuId(null); }}
+                              className="w-full text-left px-3 py-2 text-xs font-bold text-[#5a827d] hover:bg-[#fff0f0] hover:text-red-600 rounded-lg transition-colors"
+                            >
+                              Mark as OVERDUE
+                            </button>
+                          </div>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -279,12 +371,20 @@ const Invoices = () => {
 
         </div>
 
-      <button className="fixed bottom-6 right-6 md:bottom-10 md:right-10 flex items-center justify-center gap-2.5 bg-[#0e4d46] text-white px-5 md:px-7 py-3 md:py-4 rounded-[1.2rem] shadow-[0_8px_30px_rgb(14,77,70,0.3)] hover:-translate-y-1 hover:shadow-[0_12px_40px_rgb(14,77,70,0.4)] transition-all font-extrabold text-[10px] md:text-xs tracking-wide uppercase z-50">
-        <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+      <button 
+        onClick={handleGenerateInvoices}
+        disabled={generating}
+        className={`fixed bottom-6 right-6 md:bottom-10 md:right-10 flex items-center justify-center gap-2.5 bg-[#0e4d46] text-white px-5 md:px-7 py-3 md:py-4 rounded-[1.2rem] shadow-[0_8px_30px_rgb(14,77,70,0.3)] hover:-translate-y-1 hover:shadow-[0_12px_40px_rgb(14,77,70,0.4)] transition-all font-extrabold text-[10px] md:text-xs tracking-wide uppercase z-50 ${generating ? 'opacity-70 cursor-not-allowed' : ''}`}
+      >
+        <svg className={`w-4 h-4 shrink-0 ${generating ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          {generating ? (
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          ) : (
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+          )}
         </svg>
-        <span className="hidden xs:inline">Auto-Generate Invoice</span>
-        <span className="xs:hidden">Generate</span>
+        <span className="hidden xs:inline">{generating ? 'Generating...' : 'Auto-Generate Invoice'}</span>
+        <span className="xs:hidden">{generating ? '...' : 'Generate'}</span>
       </button>
 
     </div>

@@ -63,3 +63,12 @@ export const closeDeal = async (dealId, status) => {
         throw error;
     }
 };
+export const searchDeals = async (query) => {
+    try {
+        const response = await api.get(`/api/pipeline/pipeline/search/?q=${query}`);
+        return response.data;
+    } catch (error) {
+        console.error('Error searching deals:', error);
+        throw error;
+    }
+};

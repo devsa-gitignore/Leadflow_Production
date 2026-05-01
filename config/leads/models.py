@@ -180,8 +180,14 @@ class Deal(models.Model):
 
     expected_close_date = models.DateField(null=True, blank=True)
 
+    RESULT_CHOICES = [
+        ('WON', 'Won'),
+        ('LOST', 'Lost'),
+    ]
+
     is_won = models.BooleanField(default=False)
     is_lost = models.BooleanField(default=False)
+    result = models.CharField(max_length=10, choices=RESULT_CHOICES, null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -192,9 +198,9 @@ class Deal(models.Model):
 # 🔹 Invoice
 class Invoice(models.Model):
     STATUS_CHOICES = [
-        ('pending', 'Pending'),
-        ('paid', 'Paid'),
-        ('overdue', 'Overdue'),
+        ('PENDING', 'PENDING'),
+        ('PAID', 'PAID'),
+        ('OVERDUE', 'OVERDUE'),
     ]
 
     deal = models.ForeignKey(Deal, on_delete=models.CASCADE)
@@ -209,7 +215,7 @@ class Invoice(models.Model):
 
     due_date = models.DateField()
 
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING')
 
     created_at = models.DateTimeField(auto_now_add=True)
 

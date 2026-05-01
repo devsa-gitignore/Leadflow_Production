@@ -3,7 +3,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
-from django.db.models import Sum
+from django.db.models import Sum, Q
 
 from .models import Deal, PipelineStage
 from .serializers import DealSerializer
@@ -32,6 +32,7 @@ def pipeline_view(request):
             stage=stage,
             is_won=False,
             is_lost=False,
+            result__isnull=True
         )
 
         serializer = DealSerializer(stage_deals, many=True)
@@ -48,8 +49,8 @@ def pipeline_view(request):
             "deals": serializer.data,
         })
 
-    closed_deals = deals.filter(is_won=True)
-    lost_deals = deals.filter(is_lost=True)
+    closed_deals = deals.filter(Q(is_won=True) | Q(result='WON'))
+    lost_deals = deals.filter(Q(is_lost=True) | Q(result='LOST'))
 
     return Response({
         "pipeline": pipeline_data,
@@ -121,6 +122,7 @@ def add_deal(request):
     priority = request.data.get("priority", "medium")
     lead_id = request.data.get("lead_id")
     stage_id = request.data.get("stage_id")
+    result = request.data.get("result")
 
     from leads.models import Lead, PipelineStage, Deal
     from .serializers import DealSerializer
@@ -160,6 +162,10 @@ def add_deal(request):
         )
 
     # 4. Resolve the correct stage
+    # If result is provided (WON/LOST), force it to the "Closed" stage (ID 4)
+    if result:
+        stage_id = 4
+
     stage_name_map = {
         1: "Discovery",
         2: "Proposal",
@@ -179,7 +185,10 @@ def add_deal(request):
         title=title,
         deal_value=clean_value,
         priority=priority,
-        stage=stage
+        stage=stage,
+        result=result,
+        is_won=(result == 'WON'),
+        is_lost=(result == 'LOST')
     )
 
     return Response(DealSerializer(deal).data, status=201)
@@ -192,6 +201,11 @@ def update_deal(request, deal_id):
         deal = Deal.objects.get(id=deal_id)
     except Deal.DoesNotExist:
         return Response({"error": "Deal not found"}, status=404)
+
+    # If lead is unassigned, assign it to the user who is updating it
+    if deal.lead and not deal.lead.assigned_to:
+        deal.lead.assigned_to = request.user
+        deal.lead.save()
 
     serializer = DealSerializer(deal, data=request.data, partial=True)
     if serializer.is_valid():
@@ -210,3 +224,32 @@ def delete_deal(request, deal_id):
     except Deal.DoesNotExist:
         return Response({"error": "Deal not found"}, status=404)
 
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def search_deals(request):
+    query = request.query_params.get('q', '')
+    if not query:
+        return Response([])
+
+    user = request.user
+    role = getattr(user, 'role', None)
+    role_name = role.name if role else None
+
+    # Apply same permissions as pipeline_view
+    if role_name == "Sales Rep":
+        deals = Deal.objects.filter(lead__assigned_to=user)
+    elif role_name == "Sales Manager" and user.team:
+        deals = Deal.objects.filter(lead__assigned_to__team=user.team)
+    else:
+        deals = Deal.objects.all()
+
+    # Filter by title or lead name/company
+    from django.db.models import Q
+    deals = deals.filter(
+        Q(title__icontains=query) |
+        Q(lead__first_name__icontains=query) |
+        Q(lead__last_name__icontains=query) |
+        Q(lead__company__icontains=query)
+    ).distinct()[:10] # Limit to 10 recommendations
+
+    return Response(DealSerializer(deals, many=True).data)
