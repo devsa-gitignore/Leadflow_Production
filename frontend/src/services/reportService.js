@@ -9,3 +9,13 @@ export const fetchReportsSummary = async (range) => {
         throw error;
     }
 };
+
+export const setMonthlyTarget = async (targetAmount) => {
+    try {
+        const response = await api.post('/api/reports/set-target/', { target_amount: targetAmount });
+        return response.data;
+    } catch (error) {
+        console.error('Error setting monthly target:', error);
+        throw error;
+    }
+};

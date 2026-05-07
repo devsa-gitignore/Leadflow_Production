@@ -437,35 +437,52 @@ const Reports = () => {
           <div className="lg:col-span-1 bg-white rounded-3xl p-6 md:p-7 shadow-[0_2px_10px_rgb(0,0,0,0.02)] flex flex-col justify-between relative overflow-hidden">
             <h3 className="font-extrabold text-[#0e4d46] text-base mb-4">Target vs Achievement</h3>
             <div className="flex flex-col items-center justify-center flex-1">
-              <div className="relative w-40 h-40 md:w-44 md:h-44 flex justify-center items-center">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie data={data.targetData} cx="50%" cy="50%" innerRadius="70%" outerRadius="90%" startAngle={90} endAngle={-270} dataKey="value" stroke="none" cornerRadius={10} animationDuration={1500}>
-                      {data.targetData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
-                    </Pie>
-                  </PieChart>
-                </ResponsiveContainer>
-                <div className="absolute flex flex-col items-center justify-center mt-1 pointer-events-none">
-                  <span className="text-2xl md:text-3xl font-extrabold text-[#0e4d46]">
-                    <AnimatedNumber value={data.targetData[0].value} suffix="%" duration={1500} />
-                  </span>
-                  <span className="text-[8px] text-[#5a827d] font-bold mt-1 uppercase tracking-widest">Goal</span>
-                </div>
-              </div>
-            </div>
-            <div className="mt-4 pt-5 border-t border-slate-50 space-y-3">
-              <div className="flex justify-between items-center text-[10px]">
-                <span className="text-[#5a827d] font-bold uppercase tracking-widest">Achieved</span>
-                <span className="text-[#0e4d46] font-extrabold">
-                  <AnimatedNumber value={data.achievedAmount} prefix="$" suffix="k" duration={1500} />
-                </span>
-              </div>
-              <div className="flex justify-between items-center text-[10px]">
-                <span className="text-[#5a827d] font-bold uppercase tracking-widest">Target</span>
-                <span className="text-[#0e4d46] font-extrabold">
-                  <AnimatedNumber value={data.targetAmount} prefix="$" suffix="k" duration={1500} />
-                </span>
-              </div>
+              {(() => {
+                const currentRevenue = apiData ? Number(apiData.current_revenue) : 0;
+                const target = apiData ? Number(apiData.target) : 0;
+                const percentage = target > 0 ? Number(((currentRevenue / target) * 100).toFixed(1)) : 0;
+                const achievedAmount = apiData ? Number(apiData.current_revenue) : data.achievedAmount;
+                const targetAmount = apiData ? Number(apiData.target) : data.targetAmount;
+
+                const donutData = [
+                  { name: 'Achieved', value: Math.min(percentage, 100), color: '#0e4d46' },
+                  { name: 'Remaining', value: Math.max(100 - percentage, 0), color: '#eef6f4' },
+                ];
+
+                return (
+                  <>
+                    <div className="relative w-40 h-40 md:w-44 md:h-44 flex justify-center items-center">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie data={donutData} cx="50%" cy="50%" innerRadius="70%" outerRadius="90%" startAngle={90} endAngle={-270} dataKey="value" stroke="none" cornerRadius={10} animationDuration={1500}>
+                            {donutData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
+                          </Pie>
+                        </PieChart>
+                      </ResponsiveContainer>
+                      <div className="absolute flex flex-col items-center justify-center mt-1 pointer-events-none">
+                        <span className="text-2xl md:text-3xl font-extrabold text-[#0e4d46]">
+                          <AnimatedNumber value={percentage} suffix="%" duration={1500} />
+                        </span>
+                        <span className="text-[8px] text-[#5a827d] font-bold mt-1 uppercase tracking-widest">Goal</span>
+                      </div>
+                    </div>
+                    <div className="mt-4 pt-5 border-t border-slate-50 space-y-3 w-full">
+                      <div className="flex justify-between items-center text-[10px]">
+                        <span className="text-[#5a827d] font-bold uppercase tracking-widest">Achieved</span>
+                        <span className="text-[#0e4d46] font-extrabold">
+                          <AnimatedNumber value={achievedAmount} prefix="$" isCurrency duration={1500} />
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center text-[10px]">
+                        <span className="text-[#5a827d] font-bold uppercase tracking-widest">Target</span>
+                        <span className="text-[#0e4d46] font-extrabold">
+                          <AnimatedNumber value={targetAmount} prefix="$" isCurrency duration={1500} />
+                        </span>
+                      </div>
+                    </div>
+                  </>
+                );
+              })()}
             </div>
           </div>
 

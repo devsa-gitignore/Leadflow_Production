@@ -4,6 +4,7 @@ import Todo from './Todo';
 import { getCurrentUser } from '../utils/auth';
 import useDashboardData from '../hooks/useDashboardData';
 import { fetchPipelineData } from '../services/pipelineService';
+import { fetchReportsSummary, setMonthlyTarget } from '../services/reportService';
 
 const AnimatedNumber = ({ value, prefix = '', suffix = '', isCurrency = false, duration = 1000 }) => {
   const [current, setCurrent] = useState(0);
@@ -43,6 +44,22 @@ const ManagerDash = () => {
   const [pipelineLoading, setPipelineLoading] = useState(true);
   const [user, setUser] = useState(null);
 
+  // Monthly target state
+  const [targetData, setTargetData] = useState(null);
+  const [showTargetModal, setShowTargetModal] = useState(false);
+  const [targetInput, setTargetInput] = useState('');
+  const [targetSaving, setTargetSaving] = useState(false);
+  const [targetError, setTargetError] = useState('');
+
+  const loadTargetData = async () => {
+    try {
+      const data = await fetchReportsSummary('last_30_days');
+      setTargetData(data);
+    } catch (err) {
+      console.error('Failed to fetch target data', err);
+    }
+  };
+
   useEffect(() => {
     const currentUser = getCurrentUser();
     if (currentUser) {
@@ -61,7 +78,33 @@ const ManagerDash = () => {
     };
 
     getPipeline();
+    loadTargetData();
   }, []);
+
+  const handleSaveTarget = async () => {
+    setTargetError('');
+    const val = targetInput.trim();
+    if (!val) {
+      setTargetError('Please enter a target amount.');
+      return;
+    }
+    const num = Number(val);
+    if (isNaN(num) || num <= 0) {
+      setTargetError('Enter a valid positive number.');
+      return;
+    }
+    setTargetSaving(true);
+    try {
+      await setMonthlyTarget(val);
+      await loadTargetData();
+      setShowTargetModal(false);
+      setTargetInput('');
+    } catch (err) {
+      setTargetError('Failed to save target. Please try again.');
+    } finally {
+      setTargetSaving(false);
+    }
+  };
 
   if (dashboardLoading || pipelineLoading) {
     return (
@@ -176,59 +219,65 @@ const ManagerDash = () => {
         <div className="w-full xl:w-80 space-y-8">
           {/* Target vs Achieved */}
           <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
-              <h3 className="text-sm font-bold text-[#0e4d46] mb-6">Target vs Achieved</h3>
-              
-              <div className="relative flex justify-center items-center mb-8">
-                 <svg className="w-40 h-40 transform -rotate-90">
-                   {/* Background Circle */}
-                   <circle
-                     cx="80"
-                     cy="80"
-                     r="70"
-                     className="stroke-gray-50"
-                     strokeWidth="12"
-                     fill="transparent"
-                   />
-                   {/* Progress Circle */}
-                   <circle
-                     cx="80"
-                     cy="80"
-                     r="70"
-                     className="stroke-[#0e4d46] transition-all duration-1000 ease-out"
-                     strokeWidth="12"
-                     fill="transparent"
-                     strokeDasharray={2 * Math.PI * 70}
-                     strokeDashoffset={2 * Math.PI * 70 * (1 - 0.75)}
-                     strokeLinecap="round"
-                     style={{
-                       animation: 'progress 1.5s ease-out forwards'
-                     }}
-                   />
-                 </svg>
-                 <div className="absolute flex flex-col items-center justify-center">
-                      <span className="text-3xl font-extrabold text-[#0e4d46]">75%</span>
-                      <span className="text-[10px] font-bold text-[#5a827d]">Monthly Goal</span>
-                 </div>
-                 <style>{`
-                   @keyframes progress {
-                     from { stroke-dashoffset: ${2 * Math.PI * 70}; }
-                     to { stroke-dashoffset: ${2 * Math.PI * 70 * (1 - 0.75)}; }
-                   }
-                 `}</style>
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-sm font-bold text-[#0e4d46]">Target vs Achieved</h3>
+                <button
+                  onClick={() => { setTargetInput(''); setTargetError(''); setShowTargetModal(true); }}
+                  className="p-1.5 rounded-lg text-[#5a827d] hover:bg-[#f0f7f6] hover:text-[#0e4d46] transition-all"
+                  title="Set monthly target"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15.232 5.232l3.536 3.536M9 13l6.586-6.586a2 2 0 112.828 2.828L11.828 15.828a2 2 0 01-1.414.586H9v-2a2 2 0 01.586-1.414z" />
+                  </svg>
+                </button>
               </div>
 
-              <div className="flex justify-between items-center px-2">
-                  <div className="text-center">
-                      <p className="text-[10px] font-bold text-[#5a827d] uppercase mb-1">Current Achieved</p>
-                      <p className="text-lg font-bold text-[#0e4d46]">
-                         <AnimatedNumber value={450} prefix="$" suffix="k" duration={1500} />
-                      </p>
-                  </div>
-                  <div className="text-center">
-                      <p className="text-[10px] font-bold text-[#5a827d] uppercase mb-1">Goal Target</p>
-                      <p className="text-lg font-bold text-[#0e4d46]">$600k</p>
-                  </div>
-              </div>
+              {(() => {
+                const currentRevenue = targetData ? Number(targetData.current_revenue) : 0;
+                const target = targetData ? Number(targetData.target) : 0;
+                const percentage = target > 0 ? Number(((currentRevenue / target) * 100).toFixed(1)) : 0;
+                const clampedPct = Math.min(percentage, 100);
+                const circumference = 2 * Math.PI * 70;
+                const offset = circumference * (1 - clampedPct / 100);
+
+                return (
+                  <>
+                    <div className="relative flex justify-center items-center mb-8">
+                      <svg className="w-40 h-40 transform -rotate-90">
+                        <circle cx="80" cy="80" r="70" className="stroke-gray-50" strokeWidth="12" fill="transparent" />
+                        <circle
+                          cx="80" cy="80" r="70"
+                          className="stroke-[#0e4d46] transition-all duration-1000 ease-out"
+                          strokeWidth="12"
+                          fill="transparent"
+                          strokeDasharray={circumference}
+                          strokeDashoffset={offset}
+                          strokeLinecap="round"
+                        />
+                      </svg>
+                      <div className="absolute flex flex-col items-center justify-center">
+                        <span className="text-3xl font-extrabold text-[#0e4d46]">{percentage.toFixed(1)}%</span>
+                        <span className="text-[10px] font-bold text-[#5a827d]">Monthly Goal</span>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-between items-center px-2">
+                      <div className="text-center">
+                        <p className="text-[10px] font-bold text-[#5a827d] uppercase mb-1">Current Achieved</p>
+                        <p className="text-lg font-bold text-[#0e4d46]">
+                          <AnimatedNumber value={currentRevenue} prefix="$" isCurrency duration={1500} />
+                        </p>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-[10px] font-bold text-[#5a827d] uppercase mb-1">Goal Target</p>
+                        <p className="text-lg font-bold text-[#0e4d46]">
+                          <AnimatedNumber value={target} prefix="$" isCurrency duration={1500} />
+                        </p>
+                      </div>
+                    </div>
+                  </>
+                );
+              })()}
           </div>
 
           {/* Calendar */}
@@ -236,6 +285,44 @@ const ManagerDash = () => {
               <Calendar variant="mini" />
           </div>
         </div>
+
+        {/* Set Target Modal */}
+        {showTargetModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+            <div className="bg-white rounded-2xl shadow-xl p-6 w-72 border border-gray-100">
+              <h4 className="text-sm font-bold text-[#0e4d46] mb-4">Set Monthly Target</h4>
+              <input
+                type="number"
+                min="1"
+                step="any"
+                value={targetInput}
+                onChange={(e) => setTargetInput(e.target.value)}
+                placeholder="Enter target amount"
+                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-[#0e4d46] focus:outline-none focus:border-[#0e4d46] mb-2"
+                onKeyDown={(e) => { if (e.key === 'Enter') handleSaveTarget(); }}
+                autoFocus
+              />
+              {targetError && (
+                <p className="text-xs text-red-500 font-semibold mb-2">{targetError}</p>
+              )}
+              <div className="flex gap-2 mt-3">
+                <button
+                  onClick={handleSaveTarget}
+                  disabled={targetSaving}
+                  className="flex-1 bg-[#0e4d46] text-white text-xs font-bold py-2 rounded-xl hover:bg-[#0a3d37] transition-colors disabled:opacity-60"
+                >
+                  {targetSaving ? 'Saving...' : 'Save'}
+                </button>
+                <button
+                  onClick={() => { setShowTargetModal(false); setTargetError(''); }}
+                  className="flex-1 border border-gray-200 text-[#5a827d] text-xs font-bold py-2 rounded-xl hover:bg-gray-50 transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
   );
 };

@@ -1,10 +1,14 @@
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
+from rest_framework import status
 from django.db.models import Count, Sum
+from decimal import Decimal, InvalidOperation
+import datetime
 
 from leads.models import Lead
 from pipeline.models import Deal
 from .serializers import ExecutivePerformanceSerializer
+from .models import Target
 
 
 @api_view(["GET"])
@@ -164,7 +168,6 @@ def reports_summary(request):
             })
     else:
         # Group by month (last_year)
-        import datetime
         current_month = datetime.datetime.now().month
         month_names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
         
@@ -188,7 +191,47 @@ def reports_summary(request):
         "REFERRAL": deals.filter(lead_source="REFERRAL").count(),
         "SOCIAL": deals.filter(lead_source="SOCIAL").count(),
     }
-    
+
+    # --- Monthly Target Logic ---
+    today = datetime.date.today()
+    current_month_start = today.replace(day=1)
+
+    # Current month revenue (paid invoices this calendar month)
+    all_invoices = Invoice.objects.all()
+    if hasattr(user, 'role') and user.role:
+        if user.role.name == "Sales Rep":
+            all_invoices = all_invoices.filter(deal__lead__assigned_to=user)
+        elif user.role.name == "Sales Manager" and user.team:
+            all_invoices = all_invoices.filter(deal__lead__assigned_to__team=user.team)
+
+    current_revenue = all_invoices.filter(
+        status='PAID',
+        created_at__year=today.year,
+        created_at__month=today.month
+    ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
+
+    # Try current month target
+    target_obj = Target.objects.filter(user=user, month=current_month_start).first()
+
+    if target_obj is None:
+        # Try last month's target
+        if today.month == 1:
+            last_month_start = today.replace(year=today.year - 1, month=12, day=1)
+        else:
+            last_month_start = today.replace(month=today.month - 1, day=1)
+        target_obj = Target.objects.filter(user=user, month=last_month_start).first()
+
+    if target_obj is not None:
+        target_value = target_obj.target_amount
+    else:
+        # Fallback: use current revenue as target
+        target_value = current_revenue if current_revenue > 0 else Decimal('0')
+
+    if target_value > 0:
+        achievement_percentage = (Decimal(str(current_revenue)) / Decimal(str(target_value))) * Decimal('100')
+    else:
+        achievement_percentage = Decimal('0')
+
     return Response({
         "total_revenue": total_revenue,
         "total_invoiced": total_invoiced,
@@ -199,5 +242,41 @@ def reports_summary(request):
         "deals_lost": deals_lost,
         "conversion_rate": round(conversion_rate, 2),
         "lead_source_performance": lead_source_performance,
-        "trend_data": trend_data
-    })
+        "trend_data": trend_data,
+        "current_revenue": current_revenue,
+        "target": target_value,
+        "achievement_percentage": round(achievement_percentage, 2),
+    })
+
+
+@api_view(["POST"])
+def set_target(request):
+    user = request.user
+
+    raw = request.data.get("target_amount")
+
+    if raw is None or raw == "":
+        return Response({"error": "target_amount is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        target_amount = Decimal(str(raw)).quantize(Decimal("0.01"))
+    except (InvalidOperation, TypeError, ValueError):
+        return Response({"error": "Invalid target amount"}, status=status.HTTP_400_BAD_REQUEST)
+
+    if target_amount <= 0:
+        return Response({"error": "Target amount must be greater than zero"}, status=status.HTTP_400_BAD_REQUEST)
+
+    today = datetime.date.today()
+    current_month_start = today.replace(day=1)
+
+    target_obj, created = Target.objects.update_or_create(
+        user=user,
+        month=current_month_start,
+        defaults={"target_amount": target_amount},
+    )
+
+    return Response({
+        "message": "Target saved successfully",
+        "month": current_month_start.strftime("%Y-%m"),
+        "target_amount": str(target_obj.target_amount),
+    }, status=status.HTTP_200_OK)
