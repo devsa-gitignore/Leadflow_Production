@@ -289,6 +289,9 @@ const Reports = () => {
     
     // Map Lead Source Performance
     leadSources: calculateLeadSources(),
+
+    // Overdue invoices from backend
+    overdue: apiData.overdue_invoices || [],
   } : baseData;
 
 

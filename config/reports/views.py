@@ -192,6 +192,31 @@ def reports_summary(request):
         "SOCIAL": deals.filter(lead_source="SOCIAL").count(),
     }
 
+    # --- Overdue Invoices ---
+    today_date = datetime.date.today()
+    overdue_qs = Invoice.objects.filter(status='OVERDUE')
+    if hasattr(user, 'role') and user.role:
+        if user.role.name == "Sales Rep":
+            overdue_qs = overdue_qs.filter(deal__lead__assigned_to=user)
+        elif user.role.name == "Sales Manager" and user.team:
+            overdue_qs = overdue_qs.filter(deal__lead__assigned_to__team=user.team)
+
+    overdue_qs = overdue_qs.select_related('deal__lead').order_by('due_date')[:4]
+
+    overdue_invoices = []
+    for inv in overdue_qs:
+        overdue_days = (today_date - inv.due_date).days
+        company = inv.deal.lead.company if inv.deal.lead.company else (
+            f"{inv.deal.lead.first_name} {inv.deal.lead.last_name}".strip()
+        )
+        overdue_invoices.append({
+            "invoice_id": inv.id,
+            "company": company,
+            "amount": f"${inv.amount:,.2f}",
+            "days": overdue_days,
+            "isCritical": overdue_days >= 30,
+        })
+
     # --- Monthly Target Logic ---
     today = datetime.date.today()
     current_month_start = today.replace(day=1)
@@ -246,6 +271,7 @@ def reports_summary(request):
         "current_revenue": current_revenue,
         "target": target_value,
         "achievement_percentage": round(achievement_percentage, 2),
+        "overdue_invoices": overdue_invoices,
     })
 
 
