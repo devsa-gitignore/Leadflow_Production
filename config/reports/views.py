@@ -259,12 +259,18 @@ def reports_summary(request):
 
     # --- Conversion by Executive ---
     from leads.models import User as AppUser
-    exec_qs = AppUser.objects.filter(role__name__icontains="rep")
+
+    # Collect IDs of users who have at least one deal assigned to them
+    users_with_deal_ids = Deal.objects.values_list(
+        'lead__assigned_to', flat=True
+    ).distinct()
+    users_with_deals = AppUser.objects.filter(pk__in=users_with_deal_ids)
+
     if hasattr(user, 'role') and user.role:
         if user.role.name == "Sales Manager" and user.team:
-            exec_qs = exec_qs.filter(team=user.team)
+            users_with_deals = users_with_deals.filter(team=user.team)
         elif user.role.name == "Sales Rep":
-            exec_qs = exec_qs.filter(pk=user.pk)
+            users_with_deals = users_with_deals.filter(pk=user.pk)
 
     def _perf(rate):
         if rate >= 25:
@@ -274,7 +280,7 @@ def reports_summary(request):
         return "IMPROVING", "bg-yellow-100/70 text-yellow-600"
 
     conversion_by_executive = []
-    for eu in exec_qs:
+    for eu in users_with_deals:
         total_leads = Deal.objects.filter(lead__assigned_to=eu).count()
         total_converted = Deal.objects.filter(
             lead__assigned_to=eu
