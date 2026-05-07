@@ -1,7 +1,7 @@
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
-from django.db.models import Count, Sum
+from django.db.models import Count, Sum, Q
 from decimal import Decimal, InvalidOperation
 import datetime
 
@@ -257,6 +257,40 @@ def reports_summary(request):
     else:
         achievement_percentage = Decimal('0')
 
+    # --- Conversion by Executive ---
+    from leads.models import User as AppUser
+    exec_qs = AppUser.objects.filter(role__name__icontains="rep")
+    if hasattr(user, 'role') and user.role:
+        if user.role.name == "Sales Manager" and user.team:
+            exec_qs = exec_qs.filter(team=user.team)
+        elif user.role.name == "Sales Rep":
+            exec_qs = exec_qs.filter(pk=user.pk)
+
+    def _perf(rate):
+        if rate >= 25:
+            return "EXCELLENT", "bg-emerald-100/70 text-emerald-600"
+        elif rate >= 15:
+            return "ON TRACK", "bg-slate-100 text-slate-500"
+        return "IMPROVING", "bg-yellow-100/70 text-yellow-600"
+
+    conversion_by_executive = []
+    for eu in exec_qs:
+        total_leads = Deal.objects.filter(lead__assigned_to=eu).count()
+        total_converted = Deal.objects.filter(
+            lead__assigned_to=eu
+        ).filter(Q(result='WON') | Q(is_won=True)).count()
+        rate = round((total_converted / total_leads) * 100, 1) if total_leads > 0 else 0.0
+        perf, perf_color = _perf(rate)
+        full_name = f"{eu.first_name} {eu.last_name}".strip() or eu.email
+        conversion_by_executive.append({
+            "name": full_name,
+            "leads": total_leads,
+            "conversions": total_converted,
+            "rate": f"{rate}%",
+            "perf": perf,
+            "perfColor": perf_color,
+        })
+
     return Response({
         "total_revenue": total_revenue,
         "total_invoiced": total_invoiced,
@@ -272,6 +306,7 @@ def reports_summary(request):
         "target": target_value,
         "achievement_percentage": round(achievement_percentage, 2),
         "overdue_invoices": overdue_invoices,
+        "conversion_by_executive": conversion_by_executive,
     })
 
 

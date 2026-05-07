@@ -292,6 +292,9 @@ const Reports = () => {
 
     // Overdue invoices from backend
     overdue: apiData.overdue_invoices || [],
+
+    // Conversion by executive from backend
+    executives: apiData.conversion_by_executive || [],
   } : baseData;
 
 
