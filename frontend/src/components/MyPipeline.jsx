@@ -110,6 +110,13 @@ const MyPipeline = () => {
     loadData();
   }, [searchQuery]); // Reload when search query changes
 
+  const STAGE_ID_MAP = {
+    newLead: 1,
+    contacted: 2,
+    negotiation: 3,
+    closedLost: 4,
+  };
+
   const handleAddDeal = async (e) => {
     e.preventDefault();
     try {
@@ -117,9 +124,9 @@ const MyPipeline = () => {
         title: newDealTitle,
         deal_value: parseFloat(newDealValue) || 0,
         priority: newDealPriority,
-        result: newDealResult || null, // Send if selected
+        result: newDealResult || null,
         lead_source: newDealLeadSource,
-        stage: 1
+        stage_id: STAGE_ID_MAP[isAdding] ?? 1,
       });
       setNewDealTitle('');
       setNewDealValue('');
