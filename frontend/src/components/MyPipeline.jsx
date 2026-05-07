@@ -55,7 +55,8 @@ const MyPipeline = () => {
           company: deal.company || deal.title,
           value: `$${parseFloat(deal.deal_value).toLocaleString()}`,
           tag: deal.result ? deal.result : (deal.priority || 'medium').toUpperCase() + ' PRIORITY',
-          result: deal.result
+          result: deal.result,
+          assignedTo: deal.assigned_to_name || null,
         }));
 
         const filtered = filterDeals(deals);
@@ -75,7 +76,8 @@ const MyPipeline = () => {
         company: deal.company || deal.title,
         value: `$${parseFloat(deal.deal_value).toLocaleString()}`,
         tag: 'WON',
-        result: 'WON'
+        result: 'WON',
+        assignedTo: deal.assigned_to_name || null,
       }));
       const lost = data.lost_deals.map(deal => ({
         id: deal.id,
@@ -83,7 +85,8 @@ const MyPipeline = () => {
         company: deal.company || deal.title,
         value: `$${parseFloat(deal.deal_value).toLocaleString()}`,
         tag: 'LOST',
-        result: 'LOST'
+        result: 'LOST',
+        assignedTo: deal.assigned_to_name || null,
       }));
 
       newLists.closedLost = [...newLists.closedLost, ...filterDeals(closed), ...filterDeals(lost)];
@@ -216,6 +219,8 @@ const MyPipeline = () => {
     }
   };
 
+  const isManager = user?.role?.toLowerCase().includes('manager') ?? false;
+
   const renderCard = (card, listKey) => (
     <motion.div
       key={card.id}
@@ -228,9 +233,14 @@ const MyPipeline = () => {
       onDrag={(e, info) => checkTrashProximity(info)}
       onDragEnd={(e, info) => handleDragEnd(e, info, listKey, card)}
       whileDrag={{ scale: 1.05, zIndex: 100, opacity: 0.85, cursor: 'grabbing' }}
-      className="bg-white p-4 rounded-xl shadow-[0_2px_10px_rgb(0,0,0,0.02)] border border-gray-100 flex flex-col justify-between h-24 cursor-grab transition-shadow relative bg-clip-padding touch-none z-10"
+      className="bg-white p-4 rounded-xl shadow-[0_2px_10px_rgb(0,0,0,0.02)] border border-gray-100 flex flex-col justify-between min-h-[6rem] cursor-grab transition-shadow relative bg-clip-padding touch-none z-10"
     >
       <div className="font-extrabold text-[#0e4d46] text-sm truncate pointer-events-none">{card.company}</div>
+      {isManager && card.assignedTo && (
+        <div className="text-[10px] font-semibold text-[#5a827d] truncate pointer-events-none">
+          {card.assignedTo}
+        </div>
+      )}
       <div className="flex justify-between items-end">
         <span className="text-slate-400 text-xs font-bold pointer-events-none">{card.value}</span>
         
