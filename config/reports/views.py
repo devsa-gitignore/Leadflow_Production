@@ -221,7 +221,7 @@ def reports_summary(request):
     today = datetime.date.today()
     current_month_start = today.replace(day=1)
 
-    # Current month revenue (paid invoices this calendar month)
+    # Current month revenue (paid invoices this calendar month, scoped to user)
     all_invoices = Invoice.objects.all()
     if hasattr(user, 'role') and user.role:
         if user.role.name == "Sales Rep":
@@ -235,16 +235,26 @@ def reports_summary(request):
         created_at__month=today.month
     ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
 
-    # Try current month target
-    target_obj = Target.objects.filter(user=user, month=current_month_start).first()
+    # Shared team target — always look up from a manager account so all
+    # users (reps and managers) see the same value.
+    if today.month == 1:
+        last_month_start = today.replace(year=today.year - 1, month=12, day=1)
+    else:
+        last_month_start = today.replace(month=today.month - 1, day=1)
+
+    from leads.models import User as _UserModel
+    manager_qs = _UserModel.objects.filter(role__name__icontains="manager")
+
+    target_obj = Target.objects.filter(
+        user__in=manager_qs,
+        month=current_month_start,
+    ).order_by('-target_amount').first()
 
     if target_obj is None:
-        # Try last month's target
-        if today.month == 1:
-            last_month_start = today.replace(year=today.year - 1, month=12, day=1)
-        else:
-            last_month_start = today.replace(month=today.month - 1, day=1)
-        target_obj = Target.objects.filter(user=user, month=last_month_start).first()
+        target_obj = Target.objects.filter(
+            user__in=manager_qs,
+            month=last_month_start,
+        ).order_by('-target_amount').first()
 
     if target_obj is not None:
         target_value = target_obj.target_amount
@@ -260,17 +270,12 @@ def reports_summary(request):
     # --- Conversion by Executive ---
     from leads.models import User as AppUser
 
-    # Collect IDs of users who have at least one deal assigned to them
+    # All users who have at least one deal — no role/team scoping so every
+    # user sees the same global top-5 list.
     users_with_deal_ids = Deal.objects.values_list(
         'lead__assigned_to', flat=True
     ).distinct()
     users_with_deals = AppUser.objects.filter(pk__in=users_with_deal_ids)
-
-    if hasattr(user, 'role') and user.role:
-        if user.role.name == "Sales Manager" and user.team:
-            users_with_deals = users_with_deals.filter(team=user.team)
-        elif user.role.name == "Sales Rep":
-            users_with_deals = users_with_deals.filter(pk=user.pk)
 
     def _perf(rate):
         if rate >= 25:
@@ -295,7 +300,14 @@ def reports_summary(request):
             "rate": f"{rate}%",
             "perf": perf,
             "perfColor": perf_color,
+            "_rate_num": rate,  # used for sorting only
         })
+
+    # Sort by conversion rate descending, keep top 5, strip the sort key
+    conversion_by_executive.sort(key=lambda x: x["_rate_num"], reverse=True)
+    conversion_by_executive = conversion_by_executive[:5]
+    for row in conversion_by_executive:
+        del row["_rate_num"]
 
     return Response({
         "total_revenue": total_revenue,

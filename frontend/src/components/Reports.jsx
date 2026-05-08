@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
-  BarChart, Bar, XAxis, Tooltip as RechartsTooltip, ResponsiveContainer, 
+  BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, 
   PieChart, Pie, Cell 
 } from 'recharts';
 import DashboardLayout from './DashboardLayout';
@@ -300,11 +300,13 @@ const Reports = () => {
 
   const CustomBarTooltip = ({ active, payload }) => {
     if (active && payload && payload.length) {
+      const currentVal = payload.find(p => p.dataKey === 'current')?.value ?? 0;
+      const previousVal = payload.find(p => p.dataKey === 'previous')?.value ?? 0;
       return (
         <div className="bg-white p-3 shadow-lg rounded-xl border border-gray-100 text-xs font-bold text-[#0e4d46]">
           <div className="mb-1 text-slate-400">{payload[0].payload.month}</div>
-          <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-[#0e4d46]"></div> Current: ${payload[0].value.toLocaleString()}</div>
-          <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-[#cbdad8]"></div> Previous: ${payload[1].value.toLocaleString()}</div>
+          <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-[#0e4d46]"></div> Current: ${currentVal.toLocaleString()}</div>
+          <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-[#cbdad8]"></div> Previous: ${previousVal.toLocaleString()}</div>
         </div>
       );
     }
@@ -430,6 +432,7 @@ const Reports = () => {
             <div className="h-64 w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={data.trendData} margin={{ top: 10, right: 0, left: 0, bottom: 0 }} barGap={2}>
+                  <YAxis hide domain={[0, 'auto']} />
                   <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: '#94a3b8', fontWeight: 'bold' }} dy={10} />
                   <RechartsTooltip cursor={{ fill: 'transparent' }} content={<CustomBarTooltip />} />
                   <Bar dataKey="previous" fill="#e2e8f0" radius={[4, 4, 4, 4]} barSize={12} animationDuration={1500} />
@@ -446,7 +449,12 @@ const Reports = () => {
               {(() => {
                 const currentRevenue = apiData ? Number(apiData.current_revenue) : 0;
                 const target = apiData ? Number(apiData.target) : 0;
-                const percentage = target > 0 ? Number(((currentRevenue / target) * 100).toFixed(1)) : 0;
+                const percentage = target > 0 ? (currentRevenue / target) * 100 : 0;
+                const percentageLabel = percentage === 0
+                  ? '0%'
+                  : percentage >= 1
+                    ? `${Math.round(percentage)}%`
+                    : `${percentage.toFixed(2)}%`;
                 const achievedAmount = apiData ? Number(apiData.current_revenue) : data.achievedAmount;
                 const targetAmount = apiData ? Number(apiData.target) : data.targetAmount;
 
@@ -467,7 +475,7 @@ const Reports = () => {
                       </ResponsiveContainer>
                       <div className="absolute flex flex-col items-center justify-center mt-1 pointer-events-none">
                         <span className="text-2xl md:text-3xl font-extrabold text-[#0e4d46]">
-                          <AnimatedNumber value={percentage} suffix="%" duration={1500} />
+                          {percentageLabel}
                         </span>
                         <span className="text-[8px] text-[#5a827d] font-bold mt-1 uppercase tracking-widest">Goal</span>
                       </div>
