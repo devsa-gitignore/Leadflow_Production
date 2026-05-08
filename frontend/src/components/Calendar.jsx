@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { fetchCalendarEvents, createCalendarEvent, fetchUsers, updateCalendarEvent, deleteCalendarEvent } from '../services/calendarService';
 
 // Separate View Components for better scope and debugging
 const YearView = ({ fYear, today, getCalendarInfo }) => {
@@ -95,24 +96,85 @@ const MonthView = ({ fYear, fMonth, fFirstDay, fDaysIn, events, selectedDayFull,
   );
 };
 
-const CreateEventView = ({ onSave, onCancel }) => {
-  const [title, setTitle] = useState('');
-  const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
-  const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
-  const [startTime, setStartTime] = useState('10:00');
-  const [endTime, setEndTime] = useState('11:00');
+const REMINDER_OPTIONS = [
+  { label: '10 minutes before', value: 10 },
+  { label: '30 minutes before', value: 30 },
+  { label: '1 hour before', value: 60 },
+  { label: '1 day before', value: 1440 },
+];
+
+const CreateEventView = ({ onSave, onCancel, onDelete, initialData }) => {
+  const isEdit = !!initialData;
+
+  const [title, setTitle] = useState(initialData?.title || '');
+  const [startDate, setStartDate] = useState(initialData?.startDate || new Date().toISOString().split('T')[0]);
+  const [endDate, setEndDate] = useState(initialData?.endDate || new Date().toISOString().split('T')[0]);
+  const [startTime, setStartTime] = useState(initialData?.startTime || '10:00');
+  const [endTime, setEndTime] = useState(initialData?.endTime || '11:00');
   const [allDay, setAllDay] = useState(false);
-  const [location, setLocation] = useState('');
-  const [description, setDescription] = useState('');
+  const [location, setLocation] = useState(initialData?.location || '');
+  const [description, setDescription] = useState(initialData?.description || '');
+
+  // Attendees — pre-fill from initialData
+  const [guestQuery, setGuestQuery] = useState('');
+  const [userResults, setUserResults] = useState([]);
+  const [selectedAttendees, setSelectedAttendees] = useState(initialData?.attendees || []);
+
+  // Guest permissions — pre-fill from initialData
+  const [canInvite, setCanInvite] = useState(initialData?.permissions?.canInvite ?? true);
+  const [canSeeList, setCanSeeList] = useState(initialData?.permissions?.canSeeList ?? true);
+  const [canModify, setCanModify] = useState(initialData?.permissions?.canModify ?? false);
+
+  // Reminders — pre-fill from initialData
+  const [reminders, setReminders] = useState(
+    Array.isArray(initialData?.reminders) && initialData.reminders.length > 0
+      ? initialData.reminders
+      : [30]
+  );
+
+  useEffect(() => {
+    if (!guestQuery.trim()) { setUserResults([]); return; }
+    const t = setTimeout(async () => {
+      try {
+        const results = await fetchUsers(guestQuery);
+        setUserResults(results.filter(u => !selectedAttendees.find(a => a.id === u.id)));
+      } catch { setUserResults([]); }
+    }, 300);
+    return () => clearTimeout(t);
+  }, [guestQuery, selectedAttendees]);
+
+  const addAttendee = (user) => {
+    setSelectedAttendees(prev => [...prev, user]);
+    setGuestQuery('');
+    setUserResults([]);
+  };
+
+  const removeAttendee = (id) => {
+    setSelectedAttendees(prev => prev.filter(a => a.id !== id));
+  };
+
+  const addReminder = () => {
+    const unused = REMINDER_OPTIONS.find(o => !reminders.includes(o.value));
+    if (unused) setReminders(prev => [...prev, unused.value]);
+  };
+
+  const removeReminder = (val) => {
+    setReminders(prev => prev.filter(r => r !== val));
+  };
 
   const handleSave = (e) => {
     e.preventDefault();
     onSave({
       title: title || 'Untitled Event',
-      time: `${startTime} - ${endTime}`,
-      location: location || 'No location',
-      description: description || 'No description',
-      hour: parseInt(startTime.split(':')[0]) || 10
+      startDate,
+      endDate,
+      startTime,
+      endTime,
+      location,
+      description,
+      attendeeIds: selectedAttendees.map(a => a.id),
+      permissions: { canInvite, canSeeList, canModify },
+      reminders,
     });
   };
 
@@ -197,16 +259,21 @@ const CreateEventView = ({ onSave, onCancel }) => {
         <div className="flex items-center gap-4 text-[#5a827d] pt-2">
           <div className="text-[#a3c2c0] opacity-0"><svg className="w-5 h-5" /></div>
           <div className="flex flex-col space-y-3">
-            <div className="flex items-center gap-2 text-sm font-semibold text-gray-600">
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-              </svg>
-              <span>30 minutes before</span>
-              <button type="button" className="text-gray-400 hover:text-gray-600 ml-1">
-                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
-              </button>
-            </div>
-            <button type="button" className="text-sm font-bold text-[#0e4d46] hover:underline flex items-center gap-1 w-fit">
+            {reminders.map((val) => {
+              const opt = REMINDER_OPTIONS.find(o => o.value === val);
+              return (
+                <div key={val} className="flex items-center gap-2 text-sm font-semibold text-gray-600">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                  </svg>
+                  <span>{opt ? opt.label : `${val} minutes before`}</span>
+                  <button type="button" onClick={() => removeReminder(val)} className="text-gray-400 hover:text-gray-600 ml-1">
+                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                  </button>
+                </div>
+              );
+            })}
+            <button type="button" onClick={addReminder} className="text-sm font-bold text-[#0e4d46] hover:underline flex items-center gap-1 w-fit">
               + Add notification
             </button>
           </div>
@@ -225,24 +292,49 @@ const CreateEventView = ({ onSave, onCancel }) => {
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" /></svg>
               </div>
-              <input type="text" placeholder="Add guests" className="w-full pl-9 pr-4 py-2.5 bg-white border border-gray-200/60 rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#0e4d46]/20 shadow-sm" />
+              <input
+                type="text"
+                placeholder="Add guests"
+                value={guestQuery}
+                onChange={e => setGuestQuery(e.target.value)}
+                className="w-full pl-9 pr-4 py-2.5 bg-white border border-gray-200/60 rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#0e4d46]/20 shadow-sm"
+              />
+              {userResults.length > 0 && (
+                <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-100 rounded-xl shadow-lg z-50 overflow-hidden">
+                  {userResults.map(u => {
+                    const name = `${u.first_name} ${u.last_name}`.trim() || u.email;
+                    const initials = `${(u.first_name || '')[0] || ''}${(u.last_name || '')[0] || ''}`.toUpperCase() || '?';
+                    return (
+                      <button key={u.id} type="button" onClick={() => addAttendee(u)} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-[#f0f7f6] transition-colors text-left">
+                        <div className="w-7 h-7 rounded-full bg-[#e8f3f1] flex items-center justify-center text-[10px] font-bold text-[#0e4d46] shrink-0">{initials}</div>
+                        <div className="flex flex-col min-w-0">
+                          <span className="text-sm font-bold text-[#0e4d46] truncate">{name}</span>
+                          <span className="text-[10px] text-gray-400 truncate">{u.email}</span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
             <div className="space-y-4">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-[10px] font-bold text-gray-600 shrink-0">JD</div>
-                <div className="flex flex-col">
-                  <span className="text-sm font-bold text-[#0e4d46]">Arjun Raval</span>
-                  <span className="text-[10px] font-semibold text-gray-400">Organizer</span>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-[10px] font-bold text-gray-500 shrink-0">AS</div>
-                <div className="flex flex-col">
-                  <span className="text-sm font-bold text-[#0e4d46]">Sneha Mittal</span>
-                  <span className="text-[10px] font-semibold text-gray-400">Optional</span>
-                </div>
-              </div>
+              {selectedAttendees.map(u => {
+                const name = `${u.first_name} ${u.last_name}`.trim() || u.email;
+                const initials = `${(u.first_name || '')[0] || ''}${(u.last_name || '')[0] || ''}`.toUpperCase() || '?';
+                return (
+                  <div key={u.id} className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-[10px] font-bold text-gray-600 shrink-0">{initials}</div>
+                    <div className="flex flex-col flex-1 min-w-0">
+                      <span className="text-sm font-bold text-[#0e4d46] truncate">{name}</span>
+                      <span className="text-[10px] font-semibold text-gray-400">Guest</span>
+                    </div>
+                    <button type="button" onClick={() => removeAttendee(u.id)} className="text-gray-300 hover:text-gray-500 shrink-0">
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                  </div>
+                );
+              })}
             </div>
           </div>
 
@@ -253,15 +345,15 @@ const CreateEventView = ({ onSave, onCancel }) => {
             <h4 className="text-[10px] font-bold text-[#5a827d] uppercase tracking-widest mb-4">Guest Permissions</h4>
             <div className="space-y-3 bg-transparent">
               <label className="flex items-center gap-3 cursor-pointer">
-                <input type="checkbox" defaultChecked className="rounded border-gray-300 text-[#0e4d46] focus:ring-[#0e4d46] w-4 h-4 cursor-pointer" />
+                <input type="checkbox" checked={canInvite} onChange={e => setCanInvite(e.target.checked)} className="rounded border-gray-300 text-[#0e4d46] focus:ring-[#0e4d46] w-4 h-4 cursor-pointer" />
                 <span className="text-xs font-semibold text-gray-600">Invite others</span>
               </label>
               <label className="flex items-center gap-3 cursor-pointer">
-                <input type="checkbox" defaultChecked className="rounded border-gray-300 text-[#0e4d46] focus:ring-[#0e4d46] w-4 h-4 cursor-pointer" />
+                <input type="checkbox" checked={canSeeList} onChange={e => setCanSeeList(e.target.checked)} className="rounded border-gray-300 text-[#0e4d46] focus:ring-[#0e4d46] w-4 h-4 cursor-pointer" />
                 <span className="text-xs font-semibold text-gray-600">See guest list</span>
               </label>
               <label className="flex items-center gap-3 cursor-pointer">
-                <input type="checkbox" className="rounded border-gray-300 text-[#0e4d46] focus:ring-[#0e4d46] w-4 h-4 cursor-pointer" />
+                <input type="checkbox" checked={canModify} onChange={e => setCanModify(e.target.checked)} className="rounded border-gray-300 text-[#0e4d46] focus:ring-[#0e4d46] w-4 h-4 cursor-pointer" />
                 <span className="text-xs font-semibold text-gray-600">Modify event</span>
               </label>
             </div>
@@ -274,8 +366,17 @@ const CreateEventView = ({ onSave, onCancel }) => {
             <button onClick={onCancel} className="flex-1 px-4 py-2.5 rounded-xl text-sm font-bold bg-[#eef6f4] text-[#0e4d46] hover:bg-[#e0f0ed] transition-colors">
               Cancel
             </button>
+            {isEdit && (
+              <button
+                type="button"
+                onClick={onDelete}
+                className="px-4 py-2.5 rounded-xl text-sm font-bold bg-red-50 text-red-500 hover:bg-red-100 transition-colors"
+              >
+                Delete
+              </button>
+            )}
             <button onClick={handleSave} className="flex-1 px-4 py-2.5 rounded-xl text-sm font-bold bg-black text-white shadow-lg hover:bg-gray-800 transition-colors">
-              Save
+              {isEdit ? 'Update' : 'Save'}
             </button>
           </div>
         </div>
@@ -292,37 +393,90 @@ const Calendar = ({ variant = 'mini' }) => {
   // States
   const [miniViewDate, setMiniViewDate] = useState(today);
   const [selectedDay, setSelectedDay] = useState(today.getDate());
-  const [miniTasks] = useState({
-    [`${today.getFullYear()}-${today.getMonth() + 1}-12`]: ['Weekly Sync @ 2 PM'],
-    [`${today.getFullYear()}-${today.getMonth() + 1}-15`]: ['Pipeline Review']
-  });
+  const [miniTasks, setMiniTasks] = useState({});
   const [fullViewDate, setFullViewDate] = useState(today);
   const [selectedDayFull, setSelectedDayFull] = useState(today.getDate());
-  
-  // NEW STATE FOR CREATE VIEW
   const [isCreateViewOpen, setIsCreateViewOpen] = useState(false);
-  
-  const [events, setEvents] = useState({
-    [today.getDate()]: [{ 
-      title: 'Initial Team Sync', 
-      time: '10:00 AM - 11:00 AM', 
-      location: 'zoom.us/j/leadflow-123',
-      description: 'First sync of the day to discuss priorities.',
-      attendees: [{ name: 'Arjun', initials: 'AJ' }, { name: 'Priya', initials: 'PR' }],
-      type: 'primary',
-      hour: 10
-    }],
-    [24]: [{ 
-      title: 'Product Roadmap Review', 
-      time: '11:00 AM - 12:00 PM', 
-      location: 'zoom.us/j/leadflow-meeting-room',
-      description: 'Quarterly roadmap sync to align on Q4 priorities for Project Arjun.',
-      attendees: [{ name: 'Avni', initials: 'AV' }, { name: 'Rohan', initials: 'RO' }, { name: 'Sneha', initials: 'SN' }],
-      type: 'primary',
-      hour: 11
-    }]
-  });
+  const [editingEvent, setEditingEvent] = useState(null); // holds the event object being edited
+  const [events, setEvents] = useState({});
   const [view, setView] = useState('Month');
+
+  // Map API events array → { [dayOfMonth]: [eventObj, ...] } keyed to fullViewDate month/year
+  const mapApiEvents = (apiEvents, refDate) => {
+    const mapped = {};
+    apiEvents.forEach(ev => {
+      const start = new Date(ev.start_time);
+      const end = new Date(ev.end_time);
+      // Only include events in the currently viewed month/year
+      if (start.getFullYear() !== refDate.getFullYear() || start.getMonth() !== refDate.getMonth()) return;
+      const day = start.getDate();
+      const hour = start.getHours();
+      const fmt = (d) => d.toLocaleTimeString('default', { hour: '2-digit', minute: '2-digit' });
+      const attendees = (ev.attendees || []).map(a => ({
+        // Keep full API shape so edit form can send attendee_ids correctly
+        id: a.id,
+        first_name: a.first_name || '',
+        last_name: a.last_name || '',
+        email: a.email || '',
+        // Derived display fields
+        name: `${a.first_name || ''} ${a.last_name || ''}`.trim() || a.email,
+        initials: `${(a.first_name || '')[0] || ''}${(a.last_name || '')[0] || ''}`.toUpperCase() || '?',
+      }));
+      if (!mapped[day]) mapped[day] = [];
+      mapped[day].push({
+        id: ev.id,
+        title: ev.title,
+        time: `${fmt(start)} - ${fmt(end)}`,
+        location: ev.location || '',
+        description: ev.description || '',
+        attendees,
+        type: ev.event_type === 'meeting' ? 'primary' : 'secondary',
+        hour,
+        permissions: ev.permissions || {},
+        reminders: Array.isArray(ev.reminders) ? ev.reminders : [],
+        // Keep raw date/time strings for edit pre-fill
+        startDate: start.toISOString().split('T')[0],
+        endDate: end.toISOString().split('T')[0],
+        startTime: `${String(start.getHours()).padStart(2,'0')}:${String(start.getMinutes()).padStart(2,'0')}`,
+        endTime: `${String(end.getHours()).padStart(2,'0')}:${String(end.getMinutes()).padStart(2,'0')}`,
+      });
+    });
+    return mapped;
+  };
+
+  // Map API events → miniTasks { "YYYY-M-D": [title, ...] }
+  const mapApiMiniTasks = (apiEvents) => {
+    const tasks = {};
+    apiEvents.forEach(ev => {
+      const start = new Date(ev.start_time);
+      const key = `${start.getFullYear()}-${start.getMonth() + 1}-${start.getDate()}`;
+      if (!tasks[key]) tasks[key] = [];
+      tasks[key].push(ev.title);
+    });
+    return tasks;
+  };
+
+  const [allApiEvents, setAllApiEvents] = useState([]);
+
+  const loadEvents = async () => {
+    try {
+      const data = await fetchCalendarEvents();
+      setAllApiEvents(data);
+      setMiniTasks(mapApiMiniTasks(data));
+      setEvents(mapApiEvents(data, fullViewDate));
+    } catch (err) {
+      console.error('Failed to load calendar events', err);
+    }
+  };
+
+  useEffect(() => {
+    loadEvents();
+  }, []);
+
+  // Re-map events when the viewed month/year changes
+  useEffect(() => {
+    setEvents(mapApiEvents(allApiEvents, fullViewDate));
+  }, [fullViewDate, allApiEvents]);
 
   const getCalendarInfo = (date) => {
     const month = date.getMonth();
@@ -408,19 +562,63 @@ const Calendar = ({ variant = 'mini' }) => {
 
   const selectedDayEvents = events[selectedDayFull] || [];
 
-  if (isCreateViewOpen) {
+  if (isCreateViewOpen || editingEvent) {
+    // Build initialData from editingEvent for pre-filling the form
+    const initialData = editingEvent ? {
+      title: editingEvent.title,
+      startDate: editingEvent.startDate,
+      endDate: editingEvent.endDate,
+      startTime: editingEvent.startTime,
+      endTime: editingEvent.endTime,
+      location: editingEvent.location,
+      description: editingEvent.description,
+      attendees: editingEvent.attendees || [],
+      permissions: editingEvent.permissions || {},
+      reminders: editingEvent.reminders || [],
+    } : null;
+
     return (
       <div className="bg-[#eef6f4] min-h-screen relative overflow-hidden">
-        <CreateEventView 
-          onSave={(newMeeting) => {
-             const day = selectedDayFull;
-             setEvents(prev => ({
-               ...prev,
-               [day]: [...(prev[day] || []), { ...newMeeting, attendees: [{ name: 'Me', initials: 'ME' }], type: 'primary' }]
-             }));
-             setIsCreateViewOpen(false);
+        <CreateEventView
+          initialData={initialData}
+          onSave={async ({ title, startDate, endDate, startTime, endTime, location, description, attendeeIds, permissions, reminders }) => {
+            try {
+              const payload = {
+                title: title || 'Untitled Event',
+                start_time: `${startDate}T${startTime}:00`,
+                end_time: `${endDate}T${endTime}:00`,
+                location: location || '',
+                description: description || '',
+                event_type: 'meeting',
+                attendee_ids: attendeeIds || [],
+                permissions: permissions || {},
+                reminders: reminders || [],
+              };
+              if (editingEvent) {
+                await updateCalendarEvent(editingEvent.id, payload);
+              } else {
+                await createCalendarEvent(payload);
+              }
+              await loadEvents();
+              setIsCreateViewOpen(false);
+              setEditingEvent(null);
+            } catch (err) {
+              console.error('Failed to save event', err);
+              alert('Failed to save event. Please try again.');
+            }
           }}
-          onCancel={() => setIsCreateViewOpen(false)}
+          onDelete={editingEvent ? async () => {
+            if (!window.confirm(`Delete "${editingEvent.title}"? This cannot be undone.`)) return;
+            try {
+              await deleteCalendarEvent(editingEvent.id);
+              await loadEvents();
+              setEditingEvent(null);
+            } catch (err) {
+              console.error('Failed to delete event', err);
+              alert('Failed to delete event. Please try again.');
+            }
+          } : undefined}
+          onCancel={() => { setIsCreateViewOpen(false); setEditingEvent(null); }}
         />
       </div>
     );
@@ -469,6 +667,12 @@ const Calendar = ({ variant = 'mini' }) => {
               </h3>
               {selectedDayEvents.length > 0 && (
                 <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => setEditingEvent(selectedDayEvents[0])}
+                    className="border border-[#0e4d46] text-[#0e4d46] px-6 py-3 rounded-xl text-sm font-bold hover:bg-[#f0f7f6] transition-all"
+                  >
+                    Edit
+                  </button>
                   <button className="bg-[#0e4d46] text-white px-8 py-3 rounded-xl text-sm font-bold shadow-lg hover:bg-[#0a3d37] transition-all">Join Meeting</button>
                 </div>
               )}

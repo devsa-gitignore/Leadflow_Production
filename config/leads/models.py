@@ -278,6 +278,9 @@ class CalendarEvent(models.Model):
         User, blank=True, related_name='attending_events'
     )
 
+    permissions = models.JSONField(default=dict, blank=True)
+    reminders = models.JSONField(default=list, blank=True)
+
     lead = models.ForeignKey(Lead, on_delete=models.SET_NULL, null=True, blank=True)
     deal = models.ForeignKey(Deal, on_delete=models.SET_NULL, null=True, blank=True)
 

@@ -1,8 +1,25 @@
 from rest_framework import viewsets, status
+from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from .models import CalendarEvent
-from .serializers import CalendarEventSerializer
+from .models import CalendarEvent, User
+from .serializers import CalendarEventSerializer, AttendeeSerializer
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def user_list(request):
+    """Return all users for attendee search/selection."""
+    query = request.query_params.get('q', '').strip()
+    users = User.objects.all()
+    if query:
+        from django.db.models import Q
+        users = users.filter(
+            Q(first_name__icontains=query) |
+            Q(last_name__icontains=query) |
+            Q(email__icontains=query)
+        )
+    return Response(AttendeeSerializer(users, many=True).data)
 
 class CalendarEventViewSet(viewsets.ModelViewSet):
     serializer_class = CalendarEventSerializer
@@ -23,7 +40,7 @@ class CalendarEventViewSet(viewsets.ModelViewSet):
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         if serializer.is_valid():
-            serializer.save()
+            serializer.save(user=request.user)
             return Response({
                 "message": "Event created successfully",
                 "data": serializer.data
