@@ -280,6 +280,7 @@ class CalendarEvent(models.Model):
 
     permissions = models.JSONField(default=dict, blank=True)
     reminders = models.JSONField(default=list, blank=True)
+    sent_reminders = models.JSONField(default=list, blank=True)  # offsets already notified
 
     lead = models.ForeignKey(Lead, on_delete=models.SET_NULL, null=True, blank=True)
     deal = models.ForeignKey(Deal, on_delete=models.SET_NULL, null=True, blank=True)
@@ -295,6 +296,7 @@ class Notification(models.Model):
         ('payment', 'Payment'),
         ('assignment', 'Assignment'),
         ('discount', 'Discount'),
+        ('meeting', 'Meeting'),
     ]
 
     sender = models.ForeignKey(

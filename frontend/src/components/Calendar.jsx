@@ -107,8 +107,15 @@ const CreateEventView = ({ onSave, onCancel, onDelete, initialData }) => {
   const isEdit = !!initialData;
 
   const [title, setTitle] = useState(initialData?.title || '');
-  const [startDate, setStartDate] = useState(initialData?.startDate || new Date().toISOString().split('T')[0]);
-  const [endDate, setEndDate] = useState(initialData?.endDate || new Date().toISOString().split('T')[0]);
+
+  // Helper: get today's date as YYYY-MM-DD in local time (not UTC)
+  const localToday = () => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  };
+
+  const [startDate, setStartDate] = useState(initialData?.startDate || localToday());
+  const [endDate, setEndDate] = useState(initialData?.endDate || localToday());
   const [startTime, setStartTime] = useState(initialData?.startTime || '10:00');
   const [endTime, setEndTime] = useState(initialData?.endTime || '11:00');
   const [allDay, setAllDay] = useState(false);
@@ -398,6 +405,7 @@ const Calendar = ({ variant = 'mini' }) => {
   const [selectedDayFull, setSelectedDayFull] = useState(today.getDate());
   const [isCreateViewOpen, setIsCreateViewOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState(null); // holds the event object being edited
+  const [selectedEventIdx, setSelectedEventIdx] = useState(0); // which event on the selected day
   const [events, setEvents] = useState({});
   const [view, setView] = useState('Month');
 
@@ -434,9 +442,9 @@ const Calendar = ({ variant = 'mini' }) => {
         hour,
         permissions: ev.permissions || {},
         reminders: Array.isArray(ev.reminders) ? ev.reminders : [],
-        // Keep raw date/time strings for edit pre-fill
-        startDate: start.toISOString().split('T')[0],
-        endDate: end.toISOString().split('T')[0],
+        // Keep raw date/time strings for edit pre-fill — use local time, not UTC
+        startDate: `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2,'0')}-${String(start.getDate()).padStart(2,'0')}`,
+        endDate: `${end.getFullYear()}-${String(end.getMonth() + 1).padStart(2,'0')}-${String(end.getDate()).padStart(2,'0')}`,
         startTime: `${String(start.getHours()).padStart(2,'0')}:${String(start.getMinutes()).padStart(2,'0')}`,
         endTime: `${String(end.getHours()).padStart(2,'0')}:${String(end.getMinutes()).padStart(2,'0')}`,
       });
@@ -561,6 +569,9 @@ const Calendar = ({ variant = 'mini' }) => {
   };
 
   const selectedDayEvents = events[selectedDayFull] || [];
+  // Reset to first event whenever the selected day changes
+  useEffect(() => { setSelectedEventIdx(0); }, [selectedDayFull]);
+  const activeEvent = selectedDayEvents[selectedEventIdx] || selectedDayEvents[0];
 
   if (isCreateViewOpen || editingEvent) {
     // Build initialData from editingEvent for pre-filling the form
@@ -662,13 +673,28 @@ const Calendar = ({ variant = 'mini' }) => {
         {view !== 'Year' && (
           <div className="bg-[#f0f7f6] p-8 border-t border-gray-100 min-h-[300px]">
             <div className="flex justify-between items-start mb-8">
-              <h3 className="text-xl font-extrabold text-[#0e4d46]">
-                {selectedDayEvents.length > 0 ? `Event Details: ${selectedDayEvents[0].title}` : `No Events for ${selectedDayFull} ${fMonthName}`}
-              </h3>
+              <div className="flex flex-col gap-3 min-w-0">
+                <h3 className="text-xl font-extrabold text-[#0e4d46]">
+                  {selectedDayEvents.length > 0 ? `Event Details: ${activeEvent.title}` : `No Events for ${selectedDayFull} ${fMonthName}`}
+                </h3>
+                {selectedDayEvents.length > 1 && (
+                  <div className="flex flex-wrap gap-2">
+                    {selectedDayEvents.map((ev, idx) => (
+                      <button
+                        key={ev.id}
+                        onClick={() => setSelectedEventIdx(idx)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all truncate max-w-[160px] ${idx === selectedEventIdx ? 'bg-[#0e4d46] text-white' : 'bg-white text-[#5a827d] border border-gray-200 hover:border-[#0e4d46] hover:text-[#0e4d46]'}`}
+                      >
+                        {ev.title}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
               {selectedDayEvents.length > 0 && (
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 shrink-0 ml-4">
                   <button
-                    onClick={() => setEditingEvent(selectedDayEvents[0])}
+                    onClick={() => setEditingEvent(activeEvent)}
                     className="border border-[#0e4d46] text-[#0e4d46] px-6 py-3 rounded-xl text-sm font-bold hover:bg-[#f0f7f6] transition-all"
                   >
                     Edit
@@ -680,17 +706,17 @@ const Calendar = ({ variant = 'mini' }) => {
             {selectedDayEvents.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
                 <div className="space-y-6">
-                  <div><p className="text-[10px] font-extrabold text-[#5a827d] uppercase tracking-widest mb-2">TIME & DATE</p><p className="text-sm font-bold text-[#0e4d46]">{selectedDayEvents[0].time} | {selectedDayFull} {fMonthName}</p></div>
+                  <div><p className="text-[10px] font-extrabold text-[#5a827d] uppercase tracking-widest mb-2">TIME & DATE</p><p className="text-sm font-bold text-[#0e4d46]">{activeEvent.time} | {selectedDayFull} {fMonthName}</p></div>
                   <div><p className="text-[10px] font-extrabold text-[#5a827d] uppercase tracking-widest mb-2">LOCATION</p>
-                    <a href={`https://${selectedDayEvents[0].location}`} target="_blank" rel="noreferrer" className="text-sm font-bold text-blue-500 hover:underline">{selectedDayEvents[0].location}</a>
+                    <a href={`https://${activeEvent.location}`} target="_blank" rel="noreferrer" className="text-sm font-bold text-blue-500 hover:underline">{activeEvent.location}</a>
                   </div>
                 </div>
                 <div className="space-y-6">
-                  <div><p className="text-[10px] font-extrabold text-[#5a827d] uppercase tracking-widest mb-2">DESCRIPTION</p><p className="text-sm font-medium text-[#5a827d] leading-relaxed">{selectedDayEvents[0].description}</p></div>
+                  <div><p className="text-[10px] font-extrabold text-[#5a827d] uppercase tracking-widest mb-2">DESCRIPTION</p><p className="text-sm font-medium text-[#5a827d] leading-relaxed">{activeEvent.description}</p></div>
                   <div>
-                    <p className="text-[10px] font-extrabold text-[#5a827d] uppercase tracking-widest mb-4">ATTENDEES ({selectedDayEvents[0].attendees.length})</p>
+                    <p className="text-[10px] font-extrabold text-[#5a827d] uppercase tracking-widest mb-4">ATTENDEES ({activeEvent.attendees.length})</p>
                     <div className="flex flex-wrap gap-3">
-                      {selectedDayEvents[0].attendees.map((attendee, i) => (
+                      {activeEvent.attendees.map((attendee, i) => (
                         <div key={i} className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-full border border-gray-100 shadow-sm">
                           <div className="w-6 h-6 rounded-full bg-[#f0f7f6] flex items-center justify-center text-[10px] font-bold text-[#0e4d46]">{attendee.initials}</div>
                           <span className="text-xs font-bold text-[#0e4d46]">{attendee.name}</span>

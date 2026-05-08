@@ -3,11 +3,13 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework import status
 from django.db.models import Sum, Count, Q
 from django.utils import timezone
 from datetime import timedelta
 
-from .models import Lead, Deal, FollowUp, User
+from .models import Lead, Deal, FollowUp, User, Notification
 
 class DashboardDataView(APIView):
     permission_classes = [IsAuthenticated]
@@ -107,3 +109,47 @@ class DashboardDataView(APIView):
             ],
             "activeLeads": active_leads_list
         })
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def notifications_list(request):
+    """Return all notifications for the current user, newest first."""
+    notifications = Notification.objects.filter(
+        receiver=request.user
+    ).select_related('sender').order_by('-created_at')[:50]
+
+    data = [
+        {
+            "id": n.id,
+            "message": n.message,
+            "type": n.type,
+            "is_read": n.is_read,
+            "created_at": n.created_at.isoformat(),
+            "sender": f"{n.sender.first_name} {n.sender.last_name}".strip() or n.sender.email,
+        }
+        for n in notifications
+    ]
+    unread_count = Notification.objects.filter(receiver=request.user, is_read=False).count()
+    return Response({"notifications": data, "unread_count": unread_count})
+
+
+@api_view(['PATCH'])
+@permission_classes([IsAuthenticated])
+def notification_mark_read(request, pk):
+    """Mark a single notification as read."""
+    try:
+        n = Notification.objects.get(pk=pk, receiver=request.user)
+    except Notification.DoesNotExist:
+        return Response({"error": "Not found"}, status=status.HTTP_404_NOT_FOUND)
+    n.is_read = True
+    n.save(update_fields=['is_read'])
+    return Response({"id": n.id, "is_read": True})
+
+
+@api_view(['PATCH'])
+@permission_classes([IsAuthenticated])
+def notifications_mark_all_read(request):
+    """Mark all notifications for the current user as read."""
+    Notification.objects.filter(receiver=request.user, is_read=False).update(is_read=True)
+    return Response({"status": "ok"})
