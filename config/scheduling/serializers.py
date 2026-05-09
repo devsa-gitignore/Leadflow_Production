@@ -30,6 +30,7 @@ class CalendarEventSerializer(serializers.ModelSerializer):
             'event_type',
             'location',
             'meeting_link',
+            'all_day',
             'user',
             'attendees',
             'attendee_ids',
@@ -37,16 +38,21 @@ class CalendarEventSerializer(serializers.ModelSerializer):
             'deal',
             'permissions',
             'reminders',
+            'recurrence',
+            'timezone',
         ]
         read_only_fields = ['user']
         extra_kwargs = {
             'meeting_link': {'required': False, 'allow_blank': True},
+            'all_day': {'required': False},
             'description': {'required': False, 'allow_blank': True},
             'location': {'required': False, 'allow_blank': True},
             'lead': {'required': False, 'allow_null': True},
             'deal': {'required': False, 'allow_null': True},
             'permissions': {'required': False},
             'reminders': {'required': False},
+            'recurrence': {'required': False},
+            'timezone': {'required': False, 'allow_blank': True},
         }
 
     def create(self, validated_data):

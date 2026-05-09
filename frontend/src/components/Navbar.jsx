@@ -22,7 +22,6 @@ const Navbar = () => {
         <div className="hidden md:flex items-center gap-8">
           <ul className="flex gap-8">
             <li><a href="#overview" className="font-medium text-muted hover:text-primary text-sm transition-colors">Overview</a></li>
-            <li><a href="#plans" className="font-medium text-muted hover:text-primary text-sm transition-colors">Plans</a></li>
             <li><a href="#support" className="font-medium text-muted hover:text-primary text-sm transition-colors">Support</a></li>
           </ul>
           <div className="flex gap-4">

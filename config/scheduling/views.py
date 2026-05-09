@@ -6,6 +6,8 @@ from django.db.models import Q
 from .models import CalendarEvent, User
 from .serializers import CalendarEventSerializer, AttendeeSerializer
 import datetime
+from django.utils import timezone
+ 
 
 
 def _create_meeting_notifications(event, actor, verb):
@@ -115,6 +117,19 @@ class CalendarEventViewSet(viewsets.ModelViewSet):
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         if serializer.is_valid():
+            # Conflict detection: check for overlapping events for owner or attendees
+            validated = serializer.validated_data
+            start = validated.get('start_time')
+            end = validated.get('end_time')
+            attendee_qs = validated.get('attendee_ids', [])
+            attendee_ids = [u.id for u in attendee_qs] if attendee_qs else []
+            conflicts = CalendarEvent.objects.filter(
+                (Q(user=request.user) | Q(attendees__in=attendee_ids))
+            ).filter(start_time__lt=end, end_time__gt=start).distinct()
+            if conflicts.exists():
+                details = [f"{c.title} ({c.start_time} - {c.end_time})" for c in conflicts[:5]]
+                return Response({"detail": "Conflicting events exist.", "conflicts": details}, status=status.HTTP_400_BAD_REQUEST)
+
             instance = serializer.save(user=request.user)
             _create_meeting_notifications(instance, request.user, 'New meeting scheduled')
             return Response({
@@ -127,6 +142,22 @@ class CalendarEventViewSet(viewsets.ModelViewSet):
         instance = self.get_object()
         serializer = self.get_serializer(instance, data=request.data, partial=True)
         if serializer.is_valid():
+            validated = serializer.validated_data
+            new_start = validated.get('start_time', instance.start_time)
+            new_end = validated.get('end_time', instance.end_time)
+            attendee_qs = validated.get('attendee_ids', None)
+            if attendee_qs is None:
+                attendee_ids = list(instance.attendees.values_list('id', flat=True))
+            else:
+                attendee_ids = [u.id for u in attendee_qs]
+
+            conflicts = CalendarEvent.objects.filter(
+                (Q(user=instance.user) | Q(attendees__in=attendee_ids))
+            ).exclude(id=instance.id).filter(start_time__lt=new_end, end_time__gt=new_start).distinct()
+            if conflicts.exists():
+                details = [f"{c.title} ({c.start_time} - {c.end_time})" for c in conflicts[:5]]
+                return Response({"detail": "Conflicting events exist.", "conflicts": details}, status=status.HTTP_400_BAD_REQUEST)
+
             updated = serializer.save()
             _create_meeting_notifications(updated, request.user, 'Meeting updated')
             return Response({

@@ -270,6 +270,7 @@ class CalendarEvent(models.Model):
 
     location = models.CharField(max_length=255, blank=True)
     meeting_link = models.URLField(blank=True)
+    all_day = models.BooleanField(default=False)
 
     user = models.ForeignKey(
         User, on_delete=models.CASCADE, related_name='created_events'
@@ -281,6 +282,8 @@ class CalendarEvent(models.Model):
     permissions = models.JSONField(default=dict, blank=True)
     reminders = models.JSONField(default=list, blank=True)
     sent_reminders = models.JSONField(default=list, blank=True)  # offsets already notified
+    recurrence = models.JSONField(default=dict, blank=True)
+    timezone = models.CharField(max_length=64, blank=True, default='')
 
     lead = models.ForeignKey(Lead, on_delete=models.SET_NULL, null=True, blank=True)
     deal = models.ForeignKey(Deal, on_delete=models.SET_NULL, null=True, blank=True)

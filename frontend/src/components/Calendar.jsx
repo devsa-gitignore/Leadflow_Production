@@ -1,12 +1,296 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { fetchCalendarEvents, createCalendarEvent, fetchUsers, updateCalendarEvent, deleteCalendarEvent } from '../services/calendarService';
+
+const TIME_ZONE_OPTIONS = [
+  { label: 'Browser timezone', value: '' },
+  { label: 'UTC', value: 'UTC' },
+  { label: 'America/New_York', value: 'America/New_York' },
+  { label: 'America/Chicago', value: 'America/Chicago' },
+  { label: 'America/Denver', value: 'America/Denver' },
+  { label: 'America/Los_Angeles', value: 'America/Los_Angeles' },
+  { label: 'Europe/London', value: 'Europe/London' },
+  { label: 'Europe/Paris', value: 'Europe/Paris' },
+  { label: 'Asia/Dubai', value: 'Asia/Dubai' },
+  { label: 'Asia/Kolkata', value: 'Asia/Kolkata' },
+  { label: 'Asia/Singapore', value: 'Asia/Singapore' },
+  { label: 'Australia/Sydney', value: 'Australia/Sydney' },
+];
+
+const getDateTimePartsInZone = (value, timeZone) => {
+  const date = new Date(value);
+  if (!timeZone) {
+    return {
+      year: date.getFullYear(),
+      month: date.getMonth() + 1,
+      day: date.getDate(),
+      hour: date.getHours(),
+      minute: date.getMinutes(),
+      second: date.getSeconds(),
+    };
+  }
+
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(date).reduce((acc, part) => {
+    acc[part.type] = part.value;
+    return acc;
+  }, {});
+
+  return {
+    year: Number(parts.year),
+    month: Number(parts.month),
+    day: Number(parts.day),
+    hour: Number(parts.hour),
+    minute: Number(parts.minute),
+    second: Number(parts.second),
+  };
+};
+
+const formatTimeInZone = (value, timeZone) => {
+  const date = new Date(value);
+  return new Intl.DateTimeFormat('default', {
+    timeZone: timeZone || undefined,
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date);
+};
+
+const getDateKeyInZone = (value, timeZone) => {
+  const { year, month, day } = getDateTimePartsInZone(value, timeZone);
+  return `${year}-${month}-${day}`;
+};
+
+const buildIsoFromZoneParts = (dateString, timeString, timeZone) => {
+  const [year, month, day] = dateString.split('-').map(Number);
+  const [hour, minute] = timeString.split(':').map(Number);
+  const utcGuess = new Date(Date.UTC(year, month - 1, day, hour, minute, 0));
+
+  if (!timeZone) {
+    return utcGuess.toISOString();
+  }
+
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(utcGuess).reduce((acc, part) => {
+    acc[part.type] = part.value;
+    return acc;
+  }, {});
+
+  const zonedAsUtc = Date.UTC(
+    Number(parts.year),
+    Number(parts.month) - 1,
+    Number(parts.day),
+    Number(parts.hour),
+    Number(parts.minute),
+    Number(parts.second),
+  );
+
+  return new Date(utcGuess.getTime() - (zonedAsUtc - utcGuess.getTime())).toISOString();
+};
+
+// Time format converters
+const convertTo12Hour = (timeString) => {
+  const [hours, minutes] = timeString.split(':').map(Number);
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+  const hour12 = hours % 12 || 12;
+  return `${hour12.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')} ${ampm}`;
+};
+
+// TimePicker component
+const TimePicker = ({ value, onChange, disabled, format }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [tempHour, setTempHour] = useState(parseInt(value?.split(':')[0] || '10', 10));
+  const [tempMinute, setTempMinute] = useState(parseInt(value?.split(':')[1] || '00', 10));
+
+  // Display value based on format
+  const getDisplayValue = () => {
+    const timeIn24h = value || '10:00';
+    return format === '12h' ? convertTo12Hour(timeIn24h) : timeIn24h;
+  };
+
+  const handleClockClick = (e) => {
+    if (disabled) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const centerX = rect.width / 2;
+    const centerY = rect.height / 2;
+    const clickX = e.clientX - rect.left;
+    const clickY = e.clientY - rect.top;
+
+    const angle = Math.atan2(clickY - centerY, clickX - centerX);
+    const normalizedAngle = (angle + Math.PI / 2 + Math.PI * 2) % (Math.PI * 2);
+    const slot = Math.round((normalizedAngle / (Math.PI * 2)) * 12) % 12;
+
+    // Determine if we're selecting hour or minute based on distance from center
+    const distance = Math.sqrt(Math.pow(clickX - centerX, 2) + Math.pow(clickY - centerY, 2));
+    const isMinute = distance < 72; // Inner ring (65px radius) for minutes
+    const isHour = distance >= 72;   // Outer ring (75-85px radius) for hours
+
+    if (isMinute) {
+      setTempMinute((slot * 5) % 60);
+    } else if (isHour) {
+      // Always work with 24-hour format internally
+      setTempHour(slot);
+    }
+  };
+
+  const handleConfirm = () => {
+    // Always save in 24-hour format
+    const newTime = `${tempHour.toString().padStart(2, '0')}:${tempMinute.toString().padStart(2, '0')}`;
+    onChange(newTime);
+    setIsOpen(false);
+  };
+
+  const handleOpenClick = () => {
+    if (!disabled) {
+      // Sync temp values with current value when opening
+      const [h, m] = (value || '10:00').split(':').map(Number);
+      setTempHour(h);
+      setTempMinute(m);
+      setIsOpen(!isOpen);
+    }
+  };
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={handleOpenClick}
+        disabled={disabled}
+        className="w-fit bg-white px-4 py-2 border-none rounded-xl text-sm font-semibold text-gray-700 shadow-sm focus:ring-2 focus:ring-[#0e4d46]/20 outline-none disabled:bg-gray-100 disabled:text-gray-400 cursor-pointer"
+      >
+        {getDisplayValue()}
+      </button>
+
+      {isOpen && (
+        <div className="absolute top-12 left-0 z-50 bg-white border border-gray-200 rounded-xl shadow-lg p-4">
+          {/* Clock face */}
+          <div
+            onClick={handleClockClick}
+            className="w-48 h-48 border-2 border-[#0e4d46] rounded-full relative cursor-pointer bg-gradient-to-br from-gray-50 to-gray-100"
+          >
+            {/* Center dot */}
+            <div className="absolute top-1/2 left-1/2 w-2 h-2 bg-[#0e4d46] rounded-full transform -translate-x-1/2 -translate-y-1/2" />
+
+            {/* Hour markers (0-23 or 1-12 depending on format) */}
+            {Array.from({ length: format === '12h' ? 12 : 24 }).map((_, i) => {
+              const displayNum = format === '12h' ? (i === 0 ? 12 : i) : i;
+              const angle = (i / (format === '12h' ? 12 : 24)) * Math.PI * 2 - Math.PI / 2;
+              const radius = format === '12h' ? 85 : 75;
+              const x = Math.cos(angle) * radius + 96;
+              const y = Math.sin(angle) * radius + 96;
+              const isSelected = format === '12h' 
+                ? (i === 0 ? tempHour === 0 || tempHour === 12 : tempHour === i)
+                : tempHour === i;
+              return (
+                <div
+                  key={`hour-${i}`}
+                  className={`absolute w-6 h-6 flex items-center justify-center text-xs font-bold rounded-full ${
+                    isSelected 
+                      ? 'bg-[#0e4d46] text-white' 
+                      : 'text-gray-700 hover:bg-gray-200'
+                  }`}
+                  style={{ left: `${x - 12}px`, top: `${y - 12}px` }}
+                >
+                  {displayNum}
+                </div>
+              );
+            })}
+
+            {/* Minute markers */}
+            {Array.from({ length: 12 }).map((_, i) => {
+              const angle = (i / 12) * Math.PI * 2 - Math.PI / 2;
+              const x = Math.cos(angle) * 65 + 96;
+              const y = Math.sin(angle) * 65 + 96;
+              const minuteVal = (i * 5) % 60;
+              const isSelected = tempMinute === minuteVal;
+              return (
+                <div
+                  key={`minute-${i}`}
+                  className={`absolute w-2 h-2 rounded-full ${
+                    isSelected ? 'bg-[#0e4d46]' : 'bg-gray-300'
+                  }`}
+                  style={{ left: `${x}px`, top: `${y}px` }}
+                />
+              );
+            })}
+
+            {/* Hour hand */}
+            <div
+              className="absolute w-1 h-12 bg-[#0e4d46] rounded-full origin-bottom"
+              style={{
+                left: '50%',
+                bottom: '50%',
+                transform: `translateX(-50%) rotate(${(tempHour / (format === '12h' ? 12 : 24)) * 360}deg)`,
+              }}
+            />
+
+            {/* Minute hand */}
+            <div
+              className="absolute w-0.5 h-16 bg-[#a3c2c0] rounded-full origin-bottom"
+              style={{
+                left: '50%',
+                bottom: '50%',
+                transform: `translateX(-50%) rotate(${(tempMinute / 60) * 360}deg)`,
+              }}
+            />
+          </div>
+
+          {/* Time display and controls */}
+          <div className="mt-4 flex items-center justify-between gap-2">
+            <div className="text-center flex-1">
+              <div className="text-xs font-bold text-gray-500 mb-1">Time</div>
+              <div className="text-lg font-bold text-[#0e4d46]">
+                {format === '12h' 
+                  ? convertTo12Hour(`${tempHour.toString().padStart(2, '0')}:${tempMinute.toString().padStart(2, '0')}`)
+                  : `${tempHour.toString().padStart(2, '0')}:${tempMinute.toString().padStart(2, '0')}`
+                }
+              </div>
+            </div>
+          </div>
+
+          {/* Confirm/Cancel buttons */}
+          <div className="mt-4 flex gap-2">
+            <button
+              type="button"
+              onClick={handleConfirm}
+              className="flex-1 bg-[#0e4d46] text-white px-3 py-2 rounded-lg text-sm font-bold hover:bg-[#0a3a37] transition-colors"
+            >
+              Done
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsOpen(false)}
+              className="flex-1 bg-gray-200 text-gray-700 px-3 py-2 rounded-lg text-sm font-bold hover:bg-gray-300 transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
 // Separate View Components for better scope and debugging
 const YearView = ({ fYear, today, getCalendarInfo }) => {
   const months = Array.from({ length: 12 }, (_, i) => new Date(fYear, i, 1));
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8 p-8 overflow-y-auto max-h-[80vh]">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8 p-8">
       {months.map((m, idx) => {
         const { firstDay, daysIn } = getCalendarInfo(m);
         const dates = [];
@@ -37,7 +321,7 @@ const DayView = ({ selectedDayFull, fullViewDate, fYear, events }) => {
   const dayEvents = events[selectedDayFull] || [];
   const monthName = fullViewDate.toLocaleString('default', { month: 'long' });
   return (
-    <div className="flex-1 overflow-y-auto p-8 relative min-h-[600px] bg-white">
+    <div className="flex-1 p-8 relative min-h-[600px] bg-white">
       <h4 className="text-sm font-bold text-[#0e4d46] mb-8">{selectedDayFull} {monthName} {fYear}</h4>
       <div className="space-y-0 relative">
         {hours.map(h => (
@@ -58,7 +342,98 @@ const DayView = ({ selectedDayFull, fullViewDate, fYear, events }) => {
   );
 };
 
-const MonthView = ({ fYear, fMonth, fFirstDay, fDaysIn, events, selectedDayFull, setSelectedDayFull, today, daysOfWeek }) => {
+const WeekView = ({ fullViewDate, today, allApiEvents, setFullViewDate, setSelectedDayFull, onEventDragStart, onDayDrop, dragOverKey, setDragOverKey }) => {
+  const startOfWeek = new Date(fullViewDate);
+  startOfWeek.setDate(fullViewDate.getDate() - fullViewDate.getDay());
+  startOfWeek.setHours(0, 0, 0, 0);
+
+  const weekDays = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(startOfWeek);
+    d.setDate(startOfWeek.getDate() + i);
+    return d;
+  });
+
+  const eventsByDate = {};
+  allApiEvents.forEach((ev) => {
+    const key = getDateKeyInZone(ev.start_time, ev.timezone);
+    if (!eventsByDate[key]) eventsByDate[key] = [];
+    eventsByDate[key].push(ev);
+  });
+
+  return (
+    <div className="flex-1 bg-white">
+      <div className="grid grid-cols-7 border-b border-gray-50">
+        {weekDays.map((date) => {
+          const key = `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`;
+          const dayEvents = eventsByDate[key] || [];
+          const isToday =
+            date.getDate() === today.getDate() &&
+            date.getMonth() === today.getMonth() &&
+            date.getFullYear() === today.getFullYear();
+          const isSelected =
+            date.getDate() === fullViewDate.getDate() &&
+            date.getMonth() === fullViewDate.getMonth() &&
+            date.getFullYear() === fullViewDate.getFullYear();
+
+          return (
+            <div
+              key={key}
+              onClick={() => {
+                setFullViewDate(date);
+                setSelectedDayFull(date.getDate());
+              }}
+              onDragOver={(e) => {
+                e.preventDefault();
+                setDragOverKey(key);
+              }}
+              onDragLeave={() => setDragOverKey((prev) => (prev === key ? null : prev))}
+              onDrop={(e) => {
+                e.preventDefault();
+                onDayDrop(date);
+                setDragOverKey(null);
+              }}
+              className={`min-h-[520px] border-r border-gray-50 p-3 cursor-pointer transition-all ${dragOverKey === key ? 'bg-[#e8f3f1] ring-2 ring-inset ring-[#0e4d46]/25' : isSelected ? 'bg-[#f0f7f6]' : 'hover:bg-gray-50'}`}
+            >
+              <div className="mb-3">
+                <p className="text-[10px] font-bold tracking-widest text-[#5a827d] uppercase">{date.toLocaleDateString('default', { weekday: 'short' })}</p>
+                <p className={`mt-1 text-lg font-extrabold ${isToday ? 'text-white bg-[#0e4d46] w-8 h-8 rounded-full flex items-center justify-center' : 'text-[#0e4d46]'}`}>
+                  {date.getDate()}
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                {dayEvents.slice(0, 6).map((event) => {
+                  const start = new Date(event.start_time);
+                  const end = new Date(event.end_time);
+                  const time = event.all_day
+                    ? 'All day'
+                    : `${formatTimeInZone(start, event.timezone)} - ${formatTimeInZone(end, event.timezone)}`;
+
+                  return (
+                    <div
+                      key={event.id}
+                      draggable
+                      onDragStart={() => onEventDragStart(event.id)}
+                      className={`rounded-lg border px-2 py-2 cursor-move ${event.event_type === 'meeting' ? 'bg-[#0e4d46] text-white border-[#0e4d46]' : 'bg-[#e8f3f1] text-[#0e4d46] border-[#d1e6e3]'}`}
+                    >
+                      <p className="text-[11px] font-bold truncate">{event.title}</p>
+                      <p className={`text-[10px] ${event.event_type === 'meeting' ? 'text-white/80' : 'text-[#5a827d]'}`}>{time}</p>
+                    </div>
+                  );
+                })}
+                {dayEvents.length > 6 && (
+                  <p className="text-[10px] font-bold text-[#5a827d] pl-1">+{dayEvents.length - 6} more</p>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+const MonthView = ({ fYear, fMonth, fFirstDay, fDaysIn, events, selectedDayFull, setSelectedDayFull, today, daysOfWeek, onEventDragStart, onDayDrop, dragOverKey, setDragOverKey }) => {
   const datesFull = [];
   const prevMonthLastDay = new Date(fYear, fMonth, 0).getDate();
   for (let i = fFirstDay - 1; i >= 0; i--) datesFull.push({ day: prevMonthLastDay - i, currentMonth: false });
@@ -74,17 +449,41 @@ const MonthView = ({ fYear, fMonth, fFirstDay, fDaysIn, events, selectedDayFull,
       <div className="grid grid-cols-7 flex-1">
         {datesFull.map((date, index) => {
           const dayEvents = date.currentMonth ? events[date.day] || [] : [];
+          const cellKey = date.currentMonth ? `${fYear}-${fMonth + 1}-${date.day}` : `inactive-${index}`;
           const isSelected = date.currentMonth && date.day === selectedDayFull;
           const isToday = date.day === today.getDate() && fMonth === today.getMonth() && fYear === today.getFullYear() && date.currentMonth;
           return (
-            <div key={index} onClick={() => date.currentMonth && setSelectedDayFull(date.day)} className={`min-h-[120px] p-2 border-r border-b border-gray-50 last:border-r-0 transition-all cursor-pointer hover:bg-gray-50 ${!date.currentMonth ? 'bg-gray-50/30' : ''} ${isSelected ? 'ring-2 ring-inset ring-[#0e4d46] bg-[#f0f7f6]' : ''}`}>
+            <div
+              key={index}
+              onClick={() => date.currentMonth && setSelectedDayFull(date.day)}
+              onDragOver={(e) => {
+                if (!date.currentMonth) return;
+                e.preventDefault();
+                setDragOverKey(cellKey);
+              }}
+              onDragLeave={() => setDragOverKey((prev) => (prev === cellKey ? null : prev))}
+              onDrop={(e) => {
+                if (!date.currentMonth) return;
+                e.preventDefault();
+                onDayDrop(new Date(fYear, fMonth, date.day));
+                setDragOverKey(null);
+              }}
+              className={`min-h-[120px] p-2 border-r border-b border-gray-50 last:border-r-0 transition-all cursor-pointer hover:bg-gray-50 ${!date.currentMonth ? 'bg-gray-50/30' : ''} ${dragOverKey === cellKey ? 'bg-[#e8f3f1] ring-2 ring-inset ring-[#0e4d46]/25' : isSelected ? 'ring-2 ring-inset ring-[#0e4d46] bg-[#f0f7f6]' : ''}`}
+            >
               <div className="flex justify-between items-center px-1">
                 <span className={`text-xs font-extrabold ${date.currentMonth ? (isToday ? 'bg-[#0e4d46] text-white w-6 h-6 rounded-full flex items-center justify-center' : 'text-[#0e4d46]') : 'text-gray-300'}`}>{date.day}</span>
                 {dayEvents.length > 0 && <span className="w-1.5 h-1.5 rounded-full bg-[#0e4d46]/40"></span>}
               </div>
               <div className="mt-2 space-y-1">
                 {dayEvents.slice(0, 3).map((event, i) => (
-                  <div key={i} className={`px-2 py-1.5 rounded-md text-[9px] font-bold truncate transition-all ${event.type === 'primary' ? 'bg-[#0e4d46] text-white' : 'bg-[#e8f3f1] text-[#0e4d46] border border-[#d1e6e3]'}`}>{event.title}</div>
+                  <div
+                    key={i}
+                    draggable
+                    onDragStart={() => onEventDragStart(event.id)}
+                    className={`px-2 py-1.5 rounded-md text-[9px] font-bold truncate transition-all cursor-move ${event.type === 'primary' ? 'bg-[#0e4d46] text-white' : 'bg-[#e8f3f1] text-[#0e4d46] border border-[#d1e6e3]'}`}
+                  >
+                    {event.title}
+                  </div>
                 ))}
                 {dayEvents.length > 3 && <p className="text-[8px] font-bold text-[#5a827d] pl-2">+{dayEvents.length - 3} more</p>}
               </div>
@@ -103,6 +502,16 @@ const REMINDER_OPTIONS = [
   { label: '1 day before', value: 1440 },
 ];
 
+const mapApiMiniTasks = (apiEvents) => {
+  const tasks = {};
+  apiEvents.forEach((ev) => {
+    const key = getDateKeyInZone(ev.start_time, ev.timezone);
+    if (!tasks[key]) tasks[key] = [];
+    tasks[key].push(ev.title);
+  });
+  return tasks;
+};
+
 const CreateEventView = ({ onSave, onCancel, onDelete, initialData }) => {
   const isEdit = !!initialData;
 
@@ -118,8 +527,10 @@ const CreateEventView = ({ onSave, onCancel, onDelete, initialData }) => {
   const [endDate, setEndDate] = useState(initialData?.endDate || localToday());
   const [startTime, setStartTime] = useState(initialData?.startTime || '10:00');
   const [endTime, setEndTime] = useState(initialData?.endTime || '11:00');
-  const [allDay, setAllDay] = useState(false);
+  const [allDay, setAllDay] = useState(initialData?.allDay ?? false);
+  const [timeFormat, setTimeFormat] = useState('24h');
   const [location, setLocation] = useState(initialData?.location || '');
+  const [meetingLink, setMeetingLink] = useState(initialData?.meetingLink || '');
   const [description, setDescription] = useState(initialData?.description || '');
 
   // Attendees — pre-fill from initialData
@@ -140,7 +551,7 @@ const CreateEventView = ({ onSave, onCancel, onDelete, initialData }) => {
   );
 
   useEffect(() => {
-    if (!guestQuery.trim()) { setUserResults([]); return; }
+    if (!guestQuery.trim()) { return; }
     const t = setTimeout(async () => {
       try {
         const results = await fetchUsers(guestQuery);
@@ -149,6 +560,9 @@ const CreateEventView = ({ onSave, onCancel, onDelete, initialData }) => {
     }, 300);
     return () => clearTimeout(t);
   }, [guestQuery, selectedAttendees]);
+
+  const [recurrence, setRecurrence] = useState(initialData?.recurrence || { frequency: 'none' });
+  const [timeZone, setTimeZone] = useState(initialData?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone);
 
   const addAttendee = (user) => {
     setSelectedAttendees(prev => [...prev, user]);
@@ -175,20 +589,24 @@ const CreateEventView = ({ onSave, onCancel, onDelete, initialData }) => {
       title: title || 'Untitled Event',
       startDate,
       endDate,
-      startTime,
-      endTime,
+      startTime: allDay ? '00:00' : startTime,
+      endTime: allDay ? '23:59' : endTime,
+      allDay,
       location,
+      meetingLink,
       description,
       attendeeIds: selectedAttendees.map(a => a.id),
       permissions: { canInvite, canSeeList, canModify },
       reminders,
+      recurrence,
+      timezone: timeZone,
     });
   };
 
   return (
-    <div className="flex w-full h-[calc(100vh-80px)] overflow-hidden bg-transparent pt-4">
+    <div className="flex w-full bg-transparent pt-4">
       {/* Left Form Area */}
-      <div className="flex-1 flex flex-col pl-8 pr-16 pb-8 overflow-y-auto space-y-8">
+      <div className="flex-1 flex flex-col pl-8 pr-16 pb-8 space-y-8">
         
         <input 
           type="text" 
@@ -210,9 +628,17 @@ const CreateEventView = ({ onSave, onCancel, onDelete, initialData }) => {
           <div className="flex flex-col space-y-3 flex-1">
             <div className="flex items-center gap-4">
               <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="w-fit bg-white px-4 py-2 border-none rounded-xl text-sm font-semibold text-gray-700 shadow-sm focus:ring-2 focus:ring-[#0e4d46]/20 outline-none" placeholder="DD/MM/YYYY" />
-              <input type="time" value={startTime} onChange={e => setStartTime(e.target.value)} className="w-fit bg-white px-4 py-2 border-none rounded-xl text-sm font-semibold text-gray-700 shadow-sm focus:ring-2 focus:ring-[#0e4d46]/20 outline-none" placeholder="10:00" />
+              <TimePicker value={startTime} onChange={setStartTime} disabled={allDay} format={timeFormat} />
               <span className="text-gray-400 font-bold">—</span>
-              <input type="time" value={endTime} onChange={e => setEndTime(e.target.value)} className="w-fit bg-white px-4 py-2 border-none rounded-xl text-sm font-semibold text-gray-700 shadow-sm focus:ring-2 focus:ring-[#0e4d46]/20 outline-none" placeholder="11:00" />
+              <TimePicker value={endTime} onChange={setEndTime} disabled={allDay} format={timeFormat} />
+              <button
+                type="button"
+                onClick={() => setTimeFormat(timeFormat === '24h' ? '12h' : '24h')}
+                className="ml-2 bg-gray-100 hover:bg-gray-200 px-3 py-2 rounded-lg text-xs font-bold text-gray-700 transition-colors"
+                title="Toggle time format"
+              >
+                {timeFormat === '24h' ? '24h' : '12h'}
+              </button>
             </div>
             
             <div className="flex items-center gap-4">
@@ -224,7 +650,15 @@ const CreateEventView = ({ onSave, onCancel, onDelete, initialData }) => {
                 <input type="checkbox" checked={allDay} onChange={e => setAllDay(e.target.checked)} className="rounded border-gray-300 text-[#0e4d46] focus:ring-[#0e4d46] w-4 h-4 cursor-pointer" />
                 <span className="text-sm font-bold text-gray-600">All day</span>
               </label>
-              <button type="button" className="text-sm font-bold text-[#0e4d46] hover:underline">Timezone</button>
+              <select
+                value={timeZone}
+                onChange={(e) => setTimeZone(e.target.value)}
+                className="w-full sm:w-auto bg-white px-4 py-2 border-none rounded-xl text-sm font-semibold text-gray-700 shadow-sm focus:ring-2 focus:ring-[#0e4d46]/20 outline-none"
+              >
+                {TIME_ZONE_OPTIONS.map((option) => (
+                  <option key={option.value || 'browser'} value={option.value}>{option.label}</option>
+                ))}
+              </select>
             </div>
           </div>
         </div>
@@ -242,13 +676,29 @@ const CreateEventView = ({ onSave, onCancel, onDelete, initialData }) => {
             placeholder="Add location" 
             value={location}
             onChange={(e) => setLocation(e.target.value)}
-            className="flex-1 bg-transparent border-t border-b border-gray-200/60 py-4 text-sm font-medium text-gray-700 placeholder:text-gray-400 outline-none focus:border-[#a3c2c0] transition-colors"
+            className="flex-1 bg-white px-4 py-3 border-none rounded-xl text-sm font-medium text-gray-700 placeholder:text-gray-400 shadow-sm focus:ring-2 focus:ring-[#0e4d46]/20 outline-none"
+          />
+        </div>
+
+        {/* Meeting Link */}
+        <div className="flex items-center gap-4 text-[#5a827d]">
+          <div className="text-[#a3c2c0]">
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.828 10.172a4 4 0 010 5.656l-3 3a4 4 0 01-5.656-5.656l1.5-1.5m11.156-1.5a4 4 0 010 5.656l-1.5 1.5m-5.656-11.156a4 4 0 015.656 0l3 3a4 4 0 01-5.656 5.656l-1.5-1.5" />
+            </svg>
+          </div>
+          <input
+            type="text"
+            placeholder="Add meeting link"
+            value={meetingLink}
+            onChange={(e) => setMeetingLink(e.target.value)}
+            className="flex-1 bg-white px-4 py-3 border-none rounded-xl text-sm font-medium text-gray-700 placeholder:text-gray-400 shadow-sm focus:ring-2 focus:ring-[#0e4d46]/20 outline-none"
           />
         </div>
 
         {/* Description / Attachments */}
         <div className="flex items-start gap-4 text-[#5a827d]">
-          <div className="mt-4 text-[#a3c2c0]">
+          <div className="mt-3 text-[#a3c2c0]">
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
             </svg>
@@ -258,7 +708,7 @@ const CreateEventView = ({ onSave, onCancel, onDelete, initialData }) => {
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             rows="6"
-            className="flex-1 bg-transparent border-b border-gray-200/60 py-4 text-sm font-medium text-gray-700 placeholder:text-gray-400 outline-none focus:border-[#a3c2c0] transition-colors resize-none"
+            className="flex-1 bg-white px-4 py-3 border-none rounded-xl text-sm font-medium text-gray-700 placeholder:text-gray-400 shadow-sm focus:ring-2 focus:ring-[#0e4d46]/20 outline-none resize-none"
           />
         </div>
 
@@ -291,7 +741,7 @@ const CreateEventView = ({ onSave, onCancel, onDelete, initialData }) => {
       {/* Right Sidebar */}
       <div className="w-[320px] bg-[#f8fafb] rounded-[24px] border border-gray-100/50 shadow-sm flex flex-col overflow-hidden mb-8 mr-8">
         
-        <div className="p-6 flex-1 overflow-y-auto">
+        <div className="p-6 flex-1">
           {/* Attendees Section */}
           <div className="mb-8">
             <h4 className="text-xs font-bold text-[#0e4d46] uppercase tracking-widest mb-4">Attendees</h4>
@@ -303,7 +753,11 @@ const CreateEventView = ({ onSave, onCancel, onDelete, initialData }) => {
                 type="text"
                 placeholder="Add guests"
                 value={guestQuery}
-                onChange={e => setGuestQuery(e.target.value)}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setGuestQuery(value);
+                  if (!value.trim()) setUserResults([]);
+                }}
                 className="w-full pl-9 pr-4 py-2.5 bg-white border border-gray-200/60 rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#0e4d46]/20 shadow-sm"
               />
               {userResults.length > 0 && (
@@ -367,6 +821,18 @@ const CreateEventView = ({ onSave, onCancel, onDelete, initialData }) => {
           </div>
         </div>
 
+        <div className="px-6 pb-4">
+          <h4 className="text-xs font-bold text-[#5a827d] uppercase tracking-widest mb-3">Recurrence</h4>
+          <div className="mb-4">
+            <select value={recurrence.frequency} onChange={(e) => setRecurrence({ ...recurrence, frequency: e.target.value })} className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm font-bold text-[#0e4d46] bg-white">
+              <option value="none">Does not repeat</option>
+              <option value="daily">Daily</option>
+              <option value="weekly">Weekly</option>
+              <option value="monthly">Monthly</option>
+            </select>
+          </div>
+        </div>
+
         {/* Action Buttons */}
         <div className="p-6">
           <div className="flex items-center gap-3">
@@ -406,20 +872,24 @@ const Calendar = ({ variant = 'mini' }) => {
   const [isCreateViewOpen, setIsCreateViewOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState(null); // holds the event object being edited
   const [selectedEventIdx, setSelectedEventIdx] = useState(0); // which event on the selected day
-  const [events, setEvents] = useState({});
   const [view, setView] = useState('Month');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterType, setFilterType] = useState('all');
+  const [filterAttendee, setFilterAttendee] = useState('all');
+  const [draggingEventId, setDraggingEventId] = useState(null);
+  const [dragOverKey, setDragOverKey] = useState(null);
 
   // Map API events array → { [dayOfMonth]: [eventObj, ...] } keyed to fullViewDate month/year
   const mapApiEvents = (apiEvents, refDate) => {
     const mapped = {};
     apiEvents.forEach(ev => {
-      const start = new Date(ev.start_time);
-      const end = new Date(ev.end_time);
+      const startParts = getDateTimePartsInZone(ev.start_time, ev.timezone);
+      const endParts = getDateTimePartsInZone(ev.end_time, ev.timezone);
       // Only include events in the currently viewed month/year
-      if (start.getFullYear() !== refDate.getFullYear() || start.getMonth() !== refDate.getMonth()) return;
-      const day = start.getDate();
-      const hour = start.getHours();
-      const fmt = (d) => d.toLocaleTimeString('default', { hour: '2-digit', minute: '2-digit' });
+      if (startParts.year !== refDate.getFullYear() || startParts.month - 1 !== refDate.getMonth()) return;
+      const day = startParts.day;
+      const hour = startParts.hour;
+      const fmt = (value) => formatTimeInZone(value, ev.timezone);
       const attendees = (ev.attendees || []).map(a => ({
         // Keep full API shape so edit form can send attendee_ids correctly
         id: a.id,
@@ -434,57 +904,85 @@ const Calendar = ({ variant = 'mini' }) => {
       mapped[day].push({
         id: ev.id,
         title: ev.title,
-        time: `${fmt(start)} - ${fmt(end)}`,
+        time: ev.all_day ? 'All day' : `${fmt(ev.start_time)} - ${fmt(ev.end_time)}`,
+        allDay: !!ev.all_day,
         location: ev.location || '',
+        meetingLink: ev.meeting_link || '',
         description: ev.description || '',
         attendees,
         type: ev.event_type === 'meeting' ? 'primary' : 'secondary',
         hour,
         permissions: ev.permissions || {},
         reminders: Array.isArray(ev.reminders) ? ev.reminders : [],
-        // Keep raw date/time strings for edit pre-fill — use local time, not UTC
-        startDate: `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2,'0')}-${String(start.getDate()).padStart(2,'0')}`,
-        endDate: `${end.getFullYear()}-${String(end.getMonth() + 1).padStart(2,'0')}-${String(end.getDate()).padStart(2,'0')}`,
-        startTime: `${String(start.getHours()).padStart(2,'0')}:${String(start.getMinutes()).padStart(2,'0')}`,
-        endTime: `${String(end.getHours()).padStart(2,'0')}:${String(end.getMinutes()).padStart(2,'0')}`,
+        recurrence: ev.recurrence || {},
+        timezone: ev.timezone || '',
+        // Keep raw date/time strings for edit pre-fill in the selected timezone
+        startDate: `${startParts.year}-${String(startParts.month).padStart(2,'0')}-${String(startParts.day).padStart(2,'0')}`,
+        endDate: `${endParts.year}-${String(endParts.month).padStart(2,'0')}-${String(endParts.day).padStart(2,'0')}`,
+        startTime: `${String(startParts.hour).padStart(2,'0')}:${String(startParts.minute).padStart(2,'0')}`,
+        endTime: `${String(endParts.hour).padStart(2,'0')}:${String(endParts.minute).padStart(2,'0')}`,
       });
     });
     return mapped;
   };
 
   // Map API events → miniTasks { "YYYY-M-D": [title, ...] }
-  const mapApiMiniTasks = (apiEvents) => {
-    const tasks = {};
-    apiEvents.forEach(ev => {
-      const start = new Date(ev.start_time);
-      const key = `${start.getFullYear()}-${start.getMonth() + 1}-${start.getDate()}`;
-      if (!tasks[key]) tasks[key] = [];
-      tasks[key].push(ev.title);
-    });
-    return tasks;
-  };
-
   const [allApiEvents, setAllApiEvents] = useState([]);
 
-  const loadEvents = async () => {
+  const attendeeFilterOptions = Array.from(
+    allApiEvents
+      .flatMap((ev) => ev.attendees || [])
+      .reduce((acc, attendee) => {
+        if (!attendee?.id) return acc;
+        if (!acc.has(attendee.id)) {
+          const name = `${attendee.first_name || ''} ${attendee.last_name || ''}`.trim() || attendee.email || `User ${attendee.id}`;
+          acc.set(attendee.id, { id: attendee.id, name });
+        }
+        return acc;
+      }, new Map())
+      .values()
+  );
+
+  const getFilteredApiEvents = (apiEvents) => {
+    const q = searchQuery.trim().toLowerCase();
+    return apiEvents.filter((ev) => {
+      const matchesType = filterType === 'all' || ev.event_type === filterType;
+      const matchesAttendee =
+        filterAttendee === 'all' ||
+        (ev.attendees || []).some((a) => String(a.id) === filterAttendee);
+
+      const textBlob = [
+        ev.title,
+        ev.description,
+        ev.location,
+        ev.meeting_link,
+        ...(ev.attendees || []).map((a) => `${a.first_name || ''} ${a.last_name || ''} ${a.email || ''}`),
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+
+      const matchesSearch = !q || textBlob.includes(q);
+      return matchesType && matchesAttendee && matchesSearch;
+    });
+  };
+
+  const filteredApiEvents = getFilteredApiEvents(allApiEvents);
+  const events = mapApiEvents(filteredApiEvents, fullViewDate);
+
+  const loadEvents = useCallback(async () => {
     try {
       const data = await fetchCalendarEvents();
       setAllApiEvents(data);
       setMiniTasks(mapApiMiniTasks(data));
-      setEvents(mapApiEvents(data, fullViewDate));
     } catch (err) {
       console.error('Failed to load calendar events', err);
     }
-  };
+  }, []);
 
   useEffect(() => {
     loadEvents();
-  }, []);
-
-  // Re-map events when the viewed month/year changes
-  useEffect(() => {
-    setEvents(mapApiEvents(allApiEvents, fullViewDate));
-  }, [fullViewDate, allApiEvents]);
+  }, [loadEvents]);
 
   const getCalendarInfo = (date) => {
     const month = date.getMonth();
@@ -497,6 +995,16 @@ const Calendar = ({ variant = 'mini' }) => {
   const daysOfWeek = variant === 'mini' 
     ? ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa']
     : ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+
+  const selectedDayEvents = events[selectedDayFull] || [];
+  // Reset to first event whenever the selected day changes
+  useEffect(() => { setSelectedEventIdx(0); }, [selectedDayFull]);
+  const activeEvent = selectedDayEvents[selectedEventIdx] || selectedDayEvents[0];
+  const meetingHref = activeEvent?.meetingLink
+    ? (activeEvent.meetingLink.startsWith('http://') || activeEvent.meetingLink.startsWith('https://')
+      ? activeEvent.meetingLink
+      : `https://${activeEvent.meetingLink}`)
+    : '';
 
   if (variant === 'mini') {
     const { month, year, firstDay, daysIn } = getCalendarInfo(miniViewDate);
@@ -554,6 +1062,11 @@ const Calendar = ({ variant = 'mini' }) => {
       newDate.setDate(fullViewDate.getDate() + direction);
       setFullViewDate(newDate);
       setSelectedDayFull(newDate.getDate());
+    } else if (view === 'Week') {
+      const newDate = new Date(fullViewDate);
+      newDate.setDate(fullViewDate.getDate() + (direction * 7));
+      setFullViewDate(newDate);
+      setSelectedDayFull(newDate.getDate());
     } else if (view === 'Month') {
       setFullViewDate(new Date(fYear, fMonth + direction, 1));
     } else if (view === 'Year') {
@@ -563,15 +1076,63 @@ const Calendar = ({ variant = 'mini' }) => {
 
   const getHeaderText = () => {
     if (view === 'Day') return fullViewDate.toLocaleDateString('default', { day: 'numeric', month: 'long', year: 'numeric' });
+    if (view === 'Week') {
+      const weekStart = new Date(fullViewDate);
+      weekStart.setDate(fullViewDate.getDate() - fullViewDate.getDay());
+      const weekEnd = new Date(weekStart);
+      weekEnd.setDate(weekStart.getDate() + 6);
+      const sameMonth = weekStart.getMonth() === weekEnd.getMonth() && weekStart.getFullYear() === weekEnd.getFullYear();
+
+      if (sameMonth) {
+        return `${weekStart.getDate()} - ${weekEnd.getDate()} ${weekEnd.toLocaleDateString('default', { month: 'long', year: 'numeric' })}`;
+      }
+
+      return `${weekStart.toLocaleDateString('default', { day: 'numeric', month: 'short' })} - ${weekEnd.toLocaleDateString('default', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+    }
     if (view === 'Month') return fullViewDate.toLocaleDateString('default', { month: 'long', year: 'numeric' });
     if (view === 'Year') return fYear.toString();
     return '';
   };
 
-  const selectedDayEvents = events[selectedDayFull] || [];
-  // Reset to first event whenever the selected day changes
-  useEffect(() => { setSelectedEventIdx(0); }, [selectedDayFull]);
-  const activeEvent = selectedDayEvents[selectedEventIdx] || selectedDayEvents[0];
+  const handleEventDragStart = (eventId) => {
+    setDraggingEventId(eventId);
+  };
+
+  const handleEventDropToDate = async (targetDate) => {
+    if (!draggingEventId) return;
+
+    const dragged = allApiEvents.find((ev) => ev.id === draggingEventId);
+    if (!dragged) {
+      setDraggingEventId(null);
+      return;
+    }
+
+    const oldStart = new Date(dragged.start_time);
+    const oldEnd = new Date(dragged.end_time);
+    const durationMs = Math.max(oldEnd.getTime() - oldStart.getTime(), 0);
+    const eventZone = dragged.timezone || '';
+
+    const newStart = new Date(targetDate);
+    newStart.setHours(oldStart.getHours(), oldStart.getMinutes(), oldStart.getSeconds(), 0);
+
+    const newEnd = new Date(newStart.getTime() + durationMs);
+
+    try {
+      await updateCalendarEvent(dragged.id, {
+        start_time: buildIsoFromZoneParts(`${newStart.getFullYear()}-${String(newStart.getMonth() + 1).padStart(2, '0')}-${String(newStart.getDate()).padStart(2, '0')}`, `${String(newStart.getHours()).padStart(2, '0')}:${String(newStart.getMinutes()).padStart(2, '0')}`, eventZone),
+        end_time: buildIsoFromZoneParts(`${newEnd.getFullYear()}-${String(newEnd.getMonth() + 1).padStart(2, '0')}-${String(newEnd.getDate()).padStart(2, '0')}`, `${String(newEnd.getHours()).padStart(2, '0')}:${String(newEnd.getMinutes()).padStart(2, '0')}`, eventZone),
+      });
+
+      setFullViewDate(new Date(targetDate));
+      setSelectedDayFull(targetDate.getDate());
+      await loadEvents();
+    } catch (err) {
+      console.error('Failed to reschedule event', err);
+      alert('Failed to reschedule event. Please try again.');
+    } finally {
+      setDraggingEventId(null);
+    }
+  };
 
   if (isCreateViewOpen || editingEvent) {
     // Build initialData from editingEvent for pre-filling the form
@@ -581,7 +1142,10 @@ const Calendar = ({ variant = 'mini' }) => {
       endDate: editingEvent.endDate,
       startTime: editingEvent.startTime,
       endTime: editingEvent.endTime,
+      timezone: editingEvent.timezone || '',
+      allDay: editingEvent.allDay,
       location: editingEvent.location,
+      meetingLink: editingEvent.meetingLink,
       description: editingEvent.description,
       attendees: editingEvent.attendees || [],
       permissions: editingEvent.permissions || {},
@@ -589,22 +1153,27 @@ const Calendar = ({ variant = 'mini' }) => {
     } : null;
 
     return (
-      <div className="bg-[#eef6f4] min-h-screen relative overflow-hidden">
+      <div className="bg-[#eef6f4] min-h-screen relative">
         <CreateEventView
           initialData={initialData}
-          onSave={async ({ title, startDate, endDate, startTime, endTime, location, description, attendeeIds, permissions, reminders }) => {
+          onSave={async ({ title, startDate, endDate, startTime, endTime, allDay, location, meetingLink, description, attendeeIds, permissions, reminders, recurrence, timezone }) => {
             try {
               const payload = {
                 title: title || 'Untitled Event',
-                start_time: `${startDate}T${startTime}:00`,
-                end_time: `${endDate}T${endTime}:00`,
+                start_time: buildIsoFromZoneParts(startDate, startTime, timezone),
+                end_time: buildIsoFromZoneParts(endDate, endTime, timezone),
+                all_day: !!allDay,
                 location: location || '',
+                meeting_link: meetingLink || '',
                 description: description || '',
                 event_type: 'meeting',
                 attendee_ids: attendeeIds || [],
                 permissions: permissions || {},
                 reminders: reminders || [],
+                timezone: timezone || '',
               };
+              // include optional recurrence if provided
+              if (recurrence) payload.recurrence = recurrence;
               if (editingEvent) {
                 await updateCalendarEvent(editingEvent.id, payload);
               } else {
@@ -658,8 +1227,49 @@ const Calendar = ({ variant = 'mini' }) => {
             </div>
           </div>
           <div className="flex items-center gap-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search events"
+                className="w-44 md:w-56 px-3 py-2 rounded-lg border border-gray-200 text-xs font-semibold text-[#0e4d46] placeholder:text-[#9ab5b1] focus:outline-none focus:ring-2 focus:ring-[#0e4d46]/20"
+              />
+              <select
+                value={filterType}
+                onChange={(e) => setFilterType(e.target.value)}
+                className="px-3 py-2 rounded-lg border border-gray-200 text-xs font-bold text-[#0e4d46] bg-white focus:outline-none focus:ring-2 focus:ring-[#0e4d46]/20"
+              >
+                <option value="all">All Types</option>
+                <option value="meeting">Meeting</option>
+                <option value="call">Call</option>
+                <option value="reminder">Reminder</option>
+              </select>
+              <select
+                value={filterAttendee}
+                onChange={(e) => setFilterAttendee(e.target.value)}
+                className="px-3 py-2 rounded-lg border border-gray-200 text-xs font-bold text-[#0e4d46] bg-white focus:outline-none focus:ring-2 focus:ring-[#0e4d46]/20"
+              >
+                <option value="all">All Attendees</option>
+                {attendeeFilterOptions.map((a) => (
+                  <option key={a.id} value={String(a.id)}>{a.name}</option>
+                ))}
+              </select>
+              {(searchQuery || filterType !== 'all' || filterAttendee !== 'all') && (
+                <button
+                  onClick={() => {
+                    setSearchQuery('');
+                    setFilterType('all');
+                    setFilterAttendee('all');
+                  }}
+                  className="px-3 py-2 rounded-lg border border-gray-200 text-xs font-bold text-[#5a827d] hover:text-[#0e4d46] hover:border-[#0e4d46] transition-all"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
             <div className="flex bg-[#f8fafb] p-1 rounded-xl">
-              {['Day', 'Month', 'Year'].map((v) => (
+              {['Day', 'Week', 'Month', 'Year'].map((v) => (
                 <button key={v} onClick={() => setView(v)} className={`px-6 py-2 rounded-lg text-xs font-bold transition-all ${view === v ? 'bg-white text-[#0e4d46] shadow-sm' : 'text-[#5a827d] hover:text-[#0e4d46]'}`}>{v}</button>
               ))}
             </div>
@@ -667,8 +1277,9 @@ const Calendar = ({ variant = 'mini' }) => {
         </div>
 
         {view === 'Year' ? <YearView fYear={fYear} today={today} getCalendarInfo={getCalendarInfo} /> : 
-         view === 'Day' ? <DayView selectedDayFull={selectedDayFull} fullViewDate={fullViewDate} fYear={fYear} events={events} /> : 
-         <MonthView fYear={fYear} fMonth={fMonth} fFirstDay={fFirstDay} fDaysIn={fDaysIn} events={events} selectedDayFull={selectedDayFull} setSelectedDayFull={setSelectedDayFull} today={today} daysOfWeek={daysOfWeek} />}
+          view === 'Day' ? <DayView selectedDayFull={selectedDayFull} fullViewDate={fullViewDate} fYear={fYear} events={events} /> : 
+          view === 'Week' ? <WeekView fullViewDate={fullViewDate} today={today} allApiEvents={filteredApiEvents} setFullViewDate={setFullViewDate} setSelectedDayFull={setSelectedDayFull} onEventDragStart={handleEventDragStart} onDayDrop={handleEventDropToDate} dragOverKey={dragOverKey} setDragOverKey={setDragOverKey} /> :
+          <MonthView fYear={fYear} fMonth={fMonth} fFirstDay={fFirstDay} fDaysIn={fDaysIn} events={events} selectedDayFull={selectedDayFull} setSelectedDayFull={setSelectedDayFull} today={today} daysOfWeek={daysOfWeek} onEventDragStart={handleEventDragStart} onDayDrop={handleEventDropToDate} dragOverKey={dragOverKey} setDragOverKey={setDragOverKey} />}
 
         {view !== 'Year' && (
           <div className="bg-[#f0f7f6] p-8 border-t border-gray-100 min-h-[300px]">
@@ -699,16 +1310,29 @@ const Calendar = ({ variant = 'mini' }) => {
                   >
                     Edit
                   </button>
-                  <button className="bg-[#0e4d46] text-white px-8 py-3 rounded-xl text-sm font-bold shadow-lg hover:bg-[#0a3d37] transition-all">Join Meeting</button>
+                  <button
+                    onClick={() => meetingHref && window.open(meetingHref, '_blank', 'noopener,noreferrer')}
+                    disabled={!meetingHref}
+                    className={`px-8 py-3 rounded-xl text-sm font-bold shadow-lg transition-all ${meetingHref ? 'bg-[#0e4d46] text-white hover:bg-[#0a3d37]' : 'bg-gray-300 text-gray-500 cursor-not-allowed shadow-none'}`}
+                  >
+                    Join Meeting
+                  </button>
                 </div>
               )}
             </div>
             {selectedDayEvents.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
                 <div className="space-y-6">
-                  <div><p className="text-[10px] font-extrabold text-[#5a827d] uppercase tracking-widest mb-2">TIME & DATE</p><p className="text-sm font-bold text-[#0e4d46]">{activeEvent.time} | {selectedDayFull} {fMonthName}</p></div>
+                  <div><p className="text-[10px] font-extrabold text-[#5a827d] uppercase tracking-widest mb-2">TIME & DATE</p><p className="text-sm font-bold text-[#0e4d46]">{activeEvent.time} | {selectedDayFull} {fMonthName}</p><p className="text-[10px] font-semibold text-[#5a827d] mt-1">{activeEvent.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone}</p></div>
                   <div><p className="text-[10px] font-extrabold text-[#5a827d] uppercase tracking-widest mb-2">LOCATION</p>
-                    <a href={`https://${activeEvent.location}`} target="_blank" rel="noreferrer" className="text-sm font-bold text-blue-500 hover:underline">{activeEvent.location}</a>
+                    <p className="text-sm font-bold text-[#0e4d46]">{activeEvent.location || 'Not set'}</p>
+                  </div>
+                  <div><p className="text-[10px] font-extrabold text-[#5a827d] uppercase tracking-widest mb-2">MEETING LINK</p>
+                    {meetingHref ? (
+                      <a href={meetingHref} target="_blank" rel="noreferrer" className="text-sm font-bold text-blue-500 hover:underline break-all">{activeEvent.meetingLink}</a>
+                    ) : (
+                      <p className="text-sm font-bold text-[#5a827d]">Not set</p>
+                    )}
                   </div>
                 </div>
                 <div className="space-y-6">
