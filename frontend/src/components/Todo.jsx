@@ -1,53 +1,75 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { createTask, updateTask, deleteTask } from '../services/taskService';
+import { getCurrentUser } from '../utils/auth';
 
 const Todo = ({ initialItems = [], title = "To-Do List" }) => {
   const [todoItems, setTodoItems] = useState(initialItems);
   const [showAddTodo, setShowAddTodo] = useState(false);
-  const [newTodo, setNewTodo] = useState({ task: '', due: '', priority: 'Medium' });
+  const [newTodo, setNewTodo] = useState({ task: '', priority: 'Medium' });
   const [todoToDelete, setTodoToDelete] = useState(null);
+  const [loading, setLoading] = useState(false);
 
-  const handleAddTodo = (e) => {
+  useEffect(() => {
+    setTodoItems(initialItems);
+  }, [initialItems]);
+
+  const handleAddTodo = async (e) => {
     e.preventDefault();
     if (!newTodo.task.trim()) return;
     
-    let displayDue = newTodo.due;
-    if (newTodo.due) {
-        const date = new Date(newTodo.due);
-        displayDue = date.toLocaleString([], { 
-            month: 'short', 
-            day: 'numeric', 
-            hour: '2-digit', 
-            minute: '2-digit' 
+    setLoading(true);
+    try {
+        const user = getCurrentUser();
+        const response = await createTask({
+            title: newTodo.task,
+            priority: newTodo.priority,
+            user: user.id
         });
+
+        const newTask = {
+            id: response.data.id,
+            task: response.data.title,
+            priority: response.data.priority,
+            completed: response.data.is_completed
+        };
+
+        setTodoItems([newTask, ...todoItems]);
+        setNewTodo({ task: '', priority: 'Medium' });
+        setShowAddTodo(false);
+    } catch (err) {
+        console.error('Failed to create task', err);
+    } finally {
+        setLoading(false);
     }
-
-    const newTask = {
-      id: Date.now(),
-      task: newTodo.task,
-      due: displayDue || 'No due date',
-      priority: newTodo.priority,
-      completed: false
-    };
-
-    setTodoItems([newTask, ...todoItems]);
-    setNewTodo({ task: '', due: '', priority: 'Medium' });
-    setShowAddTodo(false);
   };
 
-  const toggleTodo = (id) => {
-    setTodoItems(todoItems.map(item => 
-      item.id === id ? { ...item, completed: !item.completed } : item
-    ));
+  const toggleTodo = async (id) => {
+    const item = todoItems.find(i => i.id === id);
+    if (!item) return;
+
+    try {
+        await updateTask(id, { is_completed: !item.completed });
+        setTodoItems(todoItems.map(i => 
+            i.id === id ? { ...i, completed: !i.completed } : i
+        ));
+    } catch (err) {
+        console.error('Failed to toggle task', err);
+    }
   };
 
   const handleDeleteClick = (id) => {
     setTodoToDelete(id);
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (todoToDelete) {
-      setTodoItems(todoItems.filter(item => item.id !== todoToDelete));
-      setTodoToDelete(null);
+      try {
+          await deleteTask(todoToDelete);
+          setTodoItems(todoItems.filter(item => item.id !== todoToDelete));
+          setTodoToDelete(null);
+      } catch (err) {
+          console.error('Failed to delete task', err);
+      }
     }
   };
 
@@ -115,30 +137,32 @@ const Todo = ({ initialItems = [], title = "To-Do List" }) => {
                 onChange={(e) => setNewTodo({...newTodo, task: e.target.value})}
                 />
             </div>
-            <div>
+            <div className="relative">
                 <label className="block text-[10px] font-bold text-[#5a827d] uppercase mb-1">Priority</label>
-                <select 
-                className="w-full px-4 py-2.5 rounded-xl border border-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-[#0e4d46]/10 appearance-none bg-white font-bold"
-                value={newTodo.priority}
-                onChange={(e) => setNewTodo({...newTodo, priority: e.target.value})}
-                >
-                <option value="High">High</option>
-                <option value="Medium">Medium</option>
-                <option value="Low">Low</option>
-                </select>
+                <div className="relative">
+                  <select 
+                  className="w-full px-4 py-2.5 rounded-xl border border-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-[#0e4d46]/10 appearance-none bg-white font-bold text-[#0e4d46] cursor-pointer"
+                  value={newTodo.priority}
+                  onChange={(e) => setNewTodo({...newTodo, priority: e.target.value})}
+                  >
+                  <option value="High">High</option>
+                  <option value="Medium">Medium</option>
+                  <option value="Low">Low</option>
+                  </select>
+                  <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-[#5a827d]">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </div>
+                </div>
             </div>
           </div>
-          <div>
-            <label className="block text-[10px] font-bold text-[#5a827d] uppercase mb-1">Due Date & Time</label>
-            <input 
-              type="datetime-local" 
-              className="w-full px-4 py-2.5 rounded-xl border border-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-[#0e4d46]/10 font-bold"
-              value={newTodo.due}
-              onChange={(e) => setNewTodo({...newTodo, due: e.target.value})}
-            />
-          </div>
-          <button type="submit" className="w-full bg-[#0e4d46] text-white py-2.5 rounded-xl font-bold text-sm hover:bg-[#0a3d37] transition-all shadow-sm">
-            Add to List
+          <button 
+            type="submit" 
+            disabled={loading}
+            className="w-full bg-[#0e4d46] text-white py-2.5 rounded-xl font-bold text-sm hover:bg-[#0a3d37] transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {loading ? 'Adding to List...' : 'Add to List'}
           </button>
         </form>
       )}
@@ -167,7 +191,6 @@ const Todo = ({ initialItems = [], title = "To-Do List" }) => {
                     </span>
                 )}
               </div>
-              <p className="text-[10px] font-bold text-[#5a827d]">{item.due}</p>
             </div>
             <button 
               onClick={() => handleDeleteClick(item.id)}

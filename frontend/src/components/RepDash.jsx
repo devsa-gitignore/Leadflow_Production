@@ -69,17 +69,8 @@ const RepDash = () => {
 
   const stats = data?.stats || [];
   const activeLeads = data?.activeLeads || [];
-
-  const initialTodoItems = [
-    { id: 1, task: 'Follow up with Rahul regarding Q4 contract', due: 'Today, 2:00 PM', priority: 'High', completed: true },
-    { id: 2, task: 'Prepare demo for Sonia Gupta', due: 'Oct 10, 11:00 AM', priority: 'Medium', completed: false },
-    { id: 3, task: 'Update pipeline status for Amit Singh', due: 'Oct 11, 4:00 PM', priority: 'Low', completed: false },
-  ];
-
-  const meetings = [
-    { title: 'Meeting with Rahul', time: '2:30 PM - 3:30 PM' },
-    { title: 'Follow-up Call: Sonia', time: '4:00 PM - 4:15 PM' },
-  ];
+  const meetings = data?.meetings || [];
+  const tasks = data?.tasks || [];
 
   return (
     <div className="flex flex-col xl:flex-row gap-8">
@@ -103,7 +94,7 @@ const RepDash = () => {
           </div>
 
           {/* Daily To-Do List Component */}
-          <Todo initialItems={initialTodoItems} title="Daily To-Do List" />
+          <Todo initialItems={tasks} title="Daily To-Do List" />
 
           {/* Active Leads Table */}
           <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 overflow-hidden">

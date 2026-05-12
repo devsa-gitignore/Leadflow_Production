@@ -9,7 +9,9 @@ from django.db.models import Sum, Count, Q
 from django.utils import timezone
 from datetime import timedelta
 
-from .models import Lead, Deal, FollowUp, User, Notification
+from leads.models import Lead, Deal, FollowUp, User, Notification, CalendarEvent
+from tasks.models import Task
+from leads.serializers import UserProfileSerializer
 
 class DashboardDataView(APIView):
     permission_classes = [IsAuthenticated]
@@ -66,6 +68,36 @@ class DashboardDataView(APIView):
                 "followUps": followups.filter(user=member, status='pending').count()
             })
 
+        # Upcoming Meetings
+        upcoming_meetings = CalendarEvent.objects.filter(
+            Q(user=user) | Q(attendees=user),
+            start_time__gte=timezone.now()
+        ).order_by('start_time')[:5]
+
+        meetings_data = [
+            {
+                "id": m.id,
+                "title": m.title,
+                "time": f"{m.start_time.strftime('%I:%M %p')} - {m.end_time.strftime('%I:%M %p')}",
+                "date": m.start_time.strftime('%b %d, %Y'),
+                "location": m.location,
+            }
+            for m in upcoming_meetings
+        ]
+
+        # Tasks
+        tasks = Task.objects.filter(user=user).order_by('due_date')[:10]
+        tasks_data = [
+            {
+                "id": t.id,
+                "task": t.title,
+                "due": t.due_date.strftime('%b %d, %I:%M %p') if t.due_date else 'No due date',
+                "priority": t.priority,
+                "completed": t.is_completed
+            }
+            for t in tasks
+        ]
+
         return Response({
             "stats": [
                 { "label": 'TOTAL PIPELINE VALUE', "value": float(total_pipeline/1000000), "prefix": '$', "suffix": 'M', "trend": '+6%', "positive": True },
@@ -74,7 +106,9 @@ class DashboardDataView(APIView):
                 { "label": 'OVERDUE FOLLOW-UPS', "value": overdue_followups, "prefix": '', "suffix": '', "trend": '5%', "positive": True },
                 { "label": 'DEALS CLOSING', "value": deals_closing_soon, "prefix": '', "suffix": '', "trend": '+4%', "positive": True },
             ],
-            "teamData": team_data
+            "teamData": team_data,
+            "meetings": meetings_data,
+            "tasks": tasks_data
         })
 
     def get_rep_data(self, user):
@@ -100,6 +134,36 @@ class DashboardDataView(APIView):
                 "lastContact": "Just Now" # In real app, calculate from followups
             })
 
+        # Upcoming Meetings
+        upcoming_meetings = CalendarEvent.objects.filter(
+            Q(user=user) | Q(attendees=user),
+            start_time__gte=timezone.now()
+        ).order_by('start_time')[:5]
+
+        meetings_data = [
+            {
+                "id": m.id,
+                "title": m.title,
+                "time": f"{m.start_time.strftime('%I:%M %p')} - {m.end_time.strftime('%I:%M %p')}",
+                "date": m.start_time.strftime('%b %d, %Y'),
+                "location": m.location,
+            }
+            for m in upcoming_meetings
+        ]
+
+        # Tasks
+        tasks = Task.objects.filter(user=user).order_by('due_date')[:10]
+        tasks_data = [
+            {
+                "id": t.id,
+                "task": t.title,
+                "due": t.due_date.strftime('%b %d, %I:%M %p') if t.due_date else 'No due date',
+                "priority": t.priority,
+                "completed": t.is_completed
+            }
+            for t in tasks
+        ]
+
         return Response({
             "stats": [
                 { "label": 'LEADS ASSIGNED TODAY', "value": leads_today, "prefix": '', "suffix": '', "trend": '+5%', "positive": True },
@@ -107,7 +171,9 @@ class DashboardDataView(APIView):
                 { "label": 'PERSONAL CONVERSION', "value": round(conversion_rate), "prefix": '', "suffix": '%', "trend": '-2%', "positive": False },
                 { "label": 'PENDING FOLLOW-UPS', "value": pending_followups, "prefix": '0', "suffix": '', "trend": '+1%', "positive": True },
             ],
-            "activeLeads": active_leads_list
+            "activeLeads": active_leads_list,
+            "meetings": meetings_data,
+            "tasks": tasks_data
         })
 
 
@@ -153,3 +219,24 @@ def notifications_mark_all_read(request):
     """Mark all notifications for the current user as read."""
     Notification.objects.filter(receiver=request.user, is_read=False).update(is_read=True)
     return Response({"status": "ok"})
+
+
+@api_view(['GET', 'PATCH'])
+@permission_classes([IsAuthenticated])
+def profile_view(request):
+    """GET: return current user's profile. PATCH: update profile (multipart allowed).
+
+    Endpoint: /api/leads/auth/me/
+    """
+    user = request.user
+    if request.method == 'GET':
+        serializer = UserProfileSerializer(user, context={'request': request})
+        return Response({'user': serializer.data})
+
+    # PATCH
+    serializer = UserProfileSerializer(user, data=request.data, partial=True, context={'request': request})
+    if serializer.is_valid():
+        serializer.save()
+        data = serializer.data
+        return Response({'message': 'Profile updated', 'user': data})
+    return Response({'errors': serializer.errors}, status=400)

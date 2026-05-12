@@ -128,13 +128,7 @@ const ManagerDash = () => {
 
   const stats = dashboardData?.stats || [];
   const teamData = dashboardData?.teamData || [];
-
-  const initialTodoItems = [
-    { id: 1, task: 'Review Q3 performance with Arjun', due: 'Due today, 4:00 PM', priority: 'High', completed: false },
-    { id: 2, task: 'Approve discount for Enterprise deal - Rohan', due: 'Due tomorrow, 10:00 AM', priority: 'Medium', completed: false },
-    { id: 3, task: 'Prepare weekly regional report', due: 'Due in 2 days', priority: 'Medium', completed: false },
-    { id: 4, task: 'Team sync: Pipeline strategy', due: 'Due in 3 days', priority: 'Low', completed: false },
-  ];
+  const tasks = dashboardData?.tasks || [];
 
   return (
     <div className="flex flex-col xl:flex-row gap-8">
@@ -212,7 +206,7 @@ const ManagerDash = () => {
           </div>
 
           {/* To-Do List Component */}
-          <Todo initialItems={initialTodoItems} title="Manager To-Do List" />
+          <Todo initialItems={tasks} title="Manager To-Do List" />
         </div>
 
         {/* Right Column (Side Panels) */}
@@ -278,6 +272,22 @@ const ManagerDash = () => {
                   </>
                 );
               })()}
+          </div>
+
+          {/* Upcoming Meetings */}
+          <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
+              <h3 className="text-sm font-bold text-[#0e4d46] mb-6">Upcoming Meetings</h3>
+              <div className="space-y-4">
+                {(dashboardData?.meetings || []).map((meeting, i) => (
+                  <div key={i} className="p-4 rounded-2xl bg-[#f8fafb] border border-gray-50 group hover:border-[#0e4d46]/20 transition-all cursor-pointer">
+                      <p className="text-xs font-bold text-[#0e4d46] mb-1">{meeting.title}</p>
+                      <p className="text-[10px] font-medium text-[#5a827d]">{meeting.time} • {meeting.date}</p>
+                  </div>
+                ))}
+                {(!dashboardData?.meetings || dashboardData.meetings.length === 0) && (
+                  <p className="text-[10px] font-bold text-[#5a827d] text-center py-4">No upcoming meetings</p>
+                )}
+              </div>
           </div>
 
           {/* Calendar */}

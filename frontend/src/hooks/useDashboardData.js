@@ -9,7 +9,7 @@ const useDashboardData = () => {
     const fetchDashboardData = async () => {
         try {
             setLoading(true);
-            const response = await api.get('/dashboard/stats/');
+            const response = await api.get('/api/leads/dashboard/stats/');
             setData(response.data);
             setError(null);
         } catch (err) {

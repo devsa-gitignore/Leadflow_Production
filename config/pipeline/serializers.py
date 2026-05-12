@@ -3,6 +3,7 @@ from .models import Deal
 
 class DealSerializer(serializers.ModelSerializer):
     lead_name = serializers.SerializerMethodField()
+    lead_id = serializers.SerializerMethodField()
     company = serializers.CharField(source='lead.company')
     assigned_to_name = serializers.SerializerMethodField()
 
@@ -14,6 +15,7 @@ class DealSerializer(serializers.ModelSerializer):
             'deal_value',
             'priority',
             'stage',
+            'lead_id',
             'lead_name',
             'company',
             'is_won',
@@ -27,6 +29,9 @@ class DealSerializer(serializers.ModelSerializer):
         if obj.lead:
             return f"{obj.lead.first_name} {obj.lead.last_name}"
         return None
+
+    def get_lead_id(self, obj):
+        return obj.lead_id
 
     def get_assigned_to_name(self, obj):
         if obj.lead and obj.lead.assigned_to:

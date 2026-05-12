@@ -37,7 +37,7 @@ def check_reminders(request):
     from leads.models import Notification
 
     user = request.user
-    now = datetime.datetime.now()
+    now = timezone.now()
 
     # Events the user owns or attends that haven't started yet (within next 24 h)
     window_end = now + datetime.timedelta(hours=24)

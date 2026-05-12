@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import DashboardLayout from './DashboardLayout';
-import { getCurrentUser } from '../utils/auth';
+import { getCurrentUser, logout } from '../utils/auth';
+import { getProfile, updateProfile } from '../services/userService';
 
 // MovingNumber component for character/number counting animation
 const MovingNumber = ({ value, prefix = "", suffix = "", duration = 1500 }) => {
@@ -33,6 +34,7 @@ const ProfilePage = () => {
   const [user, setUser] = useState(null);
   const [isLoaded, setIsLoaded] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [profileFile, setProfileFile] = useState(null);
   
   // Form States
   const [formData, setFormData] = useState({
@@ -44,31 +46,77 @@ const ProfilePage = () => {
   });
 
   useEffect(() => {
-    const currentUser = getCurrentUser();
-    const data = currentUser || {
-      fullName: "Amisha Patel",
-      role: "sales_manager",
-      email: "amisha.p@leadflow.com",
-      phone: "+91 9876543102",
-      location: "Mumbai, IN",
-      bio: "Amisha is a results-driven Sales Manager with over 8 years of experience in high-growth SaaS environments. Joining LeadFlow in early 2018, she has been instrumental in scaling the Indian sales division."
-    };
-    setUser(data);
-    setFormData({
-      fullName: data.fullName,
-      email: data.email,
-      phone: data.phone || "+91 9876543102",
-      timezone: "Indian Standard Time (IST)",
-      bio: data.bio || "Amisha is a results-driven Sales Manager with over 8 years of experience in high-growth SaaS environments. Joining LeadFlow in early 2018, she has been instrumental in scaling the Indian sales division."
-    });
-    
-    setTimeout(() => setIsLoaded(true), 100);
+    let mounted = true;
+    (async () => {
+      try {
+        const apiUser = await getProfile();
+        if (mounted && apiUser) {
+          const fullName = `${apiUser.first_name} ${apiUser.last_name}`.trim();
+          const data = {
+            fullName,
+            role: apiUser.role || 'sales_representative',
+            email: apiUser.email,
+            phone: apiUser.phone || '',
+            location: apiUser.team || '',
+            bio: apiUser.bio || '',
+            profile_picture: apiUser.profile_picture || null,
+          };
+          setUser(data);
+          setFormData({
+            fullName: data.fullName,
+            email: data.email,
+            phone: data.phone || '+91 9876543102',
+            timezone: 'Indian Standard Time (IST)',
+            bio: data.bio || ''
+          });
+          setIsLoaded(true);
+        }
+      } catch (err) {
+        // If API fails, prefer any stored user; avoid hardcoded manager fallback.
+        const currentUser = getCurrentUser();
+        if (mounted && currentUser) {
+          const data = currentUser;
+          setUser(data);
+          setFormData({ fullName: data.fullName, email: data.email, phone: data.phone || '+91 9876543102', timezone: 'Indian Standard Time (IST)', bio: data.bio || '' });
+          setIsLoaded(true);
+        } else {
+          // leave in unloaded state and surface an error in console
+          console.error('Failed to load profile from API and no cached user found', err);
+        }
+      }
+    })();
+    return () => { mounted = false; };
   }, []);
 
   const handleSave = (e) => {
     e.preventDefault();
-    setUser({ ...user, ...formData });
-    setIsEditing(false);
+    (async () => {
+      try {
+        const fd = new FormData();
+        const [firstName, ...lastParts] = formData.fullName.trim().split(' ');
+        fd.append('first_name', firstName || '');
+        fd.append('last_name', lastParts.join(' ') || '');
+        fd.append('phone', formData.phone || '');
+        fd.append('bio', formData.bio || '');
+        if (profileFile) fd.append('profile_picture', profileFile);
+
+        const res = await updateProfile(fd);
+        if (res?.user) {
+          // update local copy
+          const updated = res.user;
+          const fullName = `${updated.first_name} ${updated.last_name}`.trim();
+          setUser({ ...user, fullName, email: updated.email, phone: updated.phone, profile_picture: updated.profile_picture });
+          // persist to localStorage used by auth utilities
+          try { localStorage.setItem('leadflow_user', JSON.stringify({ id: updated.id, first_name: updated.first_name, last_name: updated.last_name, email: updated.email, role: updated.role, profile_picture: updated.profile_picture })); } catch (e) {}
+          // inform user of success
+          alert('Profile updated successfully');
+        }
+        setIsEditing(false);
+      } catch (err) {
+        console.error('Profile save failed', err);
+        alert('Failed to update profile. Check console for details.');
+      }
+    })();
   };
 
   const performanceMetrics = [
@@ -143,7 +191,10 @@ const ProfilePage = () => {
           <div className="text-gray-300"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg></div>
           <div className="flex items-center gap-4 bg-[#0e4d46] px-8 py-5 rounded-[24px] shadow-xl shadow-[#0e4d46]/20 relative z-10 min-w-[220px] scale-105 border-2 border-white/10 hover:brightness-110 transition-all duration-300">
             <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center text-white"><svg className="w-8 h-8" fill="currentColor" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" /></svg></div>
-            <div><p className="text-md font-black text-white">{user?.fullName}</p><p className="text-[10px] font-bold text-white/70 uppercase tracking-widest">Manager (YOU)</p></div>
+            <div>
+              <p className="text-md font-black text-white">{user?.fullName}</p>
+              <p className="text-[10px] font-bold text-white/70 uppercase tracking-widest">{user?.role ? `${user.role}`.replace('_', ' ').toUpperCase() + ' (YOU)' : 'YOU'}</p>
+            </div>
           </div>
           <div className="text-gray-300"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg></div>
           <div className="flex items-center gap-6 bg-[#f8fafb] px-6 py-4 rounded-[24px] border border-gray-50 min-w-[280px] hover:shadow-md transition-shadow">
@@ -169,17 +220,23 @@ const ProfilePage = () => {
         {/* Profile Photo Management */}
         <div className="flex items-center gap-8 group">
           <div className="w-32 h-32 rounded-full bg-gray-100 border-4 border-[#f0f7f6] shadow-inner flex items-center justify-center overflow-hidden transition-transform group-hover:scale-105 duration-500">
-            <svg className="w-16 h-16 text-gray-300" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
-            </svg>
+            {user?.profile_picture ? (
+              <img src={user.profile_picture} alt="profile" className="w-full h-full object-cover" />
+            ) : (
+              <svg className="w-16 h-16 text-gray-300" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
+              </svg>
+            )}
           </div>
           <div className="space-y-3">
             <p className="text-sm font-black text-[#0e4d46]">Profile Photo</p>
             <p className="text-[10px] font-bold text-[#5a827d] opacity-60">JPG, GIF or PNG. Max size of 800K</p>
             <div className="flex gap-3">
-              <button className="px-5 py-2.5 bg-[#0e4d46] text-white rounded-xl text-xs font-black shadow-md hover:bg-[#0a3d37] transition-all">Change Photo</button>
-              <button className="px-5 py-2.5 bg-[#f0f7f6] text-[#0e4d46] rounded-xl text-xs font-black hover:bg-red-50 hover:text-red-600 transition-all">Remove</button>
+              <input id="profileFileInput" type="file" accept="image/*" className="hidden" onChange={e => setProfileFile(e.target.files[0])} />
+              <button type="button" onClick={() => document.getElementById('profileFileInput').click()} className="px-5 py-2.5 bg-[#0e4d46] text-white rounded-xl text-xs font-black shadow-md hover:bg-[#0a3d37] transition-all">Change Photo</button>
+              <button type="button" onClick={() => { setProfileFile(null); try { document.getElementById('profileFileInput').value = ''; } catch(e){} }} className="px-5 py-2.5 bg-[#f0f7f6] text-[#0e4d46] rounded-xl text-xs font-black hover:bg-red-50 hover:text-red-600 transition-all">Remove</button>
             </div>
+            {profileFile && <div className="text-sm text-gray-600">Selected: {profileFile.name}</div>}
           </div>
         </div>
 

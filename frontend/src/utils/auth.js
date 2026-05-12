@@ -18,7 +18,7 @@ export const signup = async (userData) => {
     };
 
     try {
-        const response = await api.post('/auth/signup/', {
+        const response = await api.post('/api/leads/auth/signup/', {
             first_name: firstName,
             last_name: lastName,
             email: userData.email,
@@ -51,7 +51,7 @@ export const login = async (email, password, role) => {
     };
 
     try {
-        const response = await api.post('/auth/login/', {
+        const response = await api.post('/api/leads/auth/login/', {
             email,
             password,
             role_name: roleMapping[role] || role
@@ -85,7 +85,7 @@ export const getCurrentUser = () => {
  */
 export const logout = async () => {
     try {
-        await api.post('/auth/logout/');
+        await api.post('/api/leads/auth/logout/');
     } catch (error) {
         console.error('Logout error', error);
     } finally {

@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import CalendarEvent, User
+from scheduling.models import CalendarEvent, User
 
 
 class AttendeeSerializer(serializers.ModelSerializer):
@@ -11,6 +11,9 @@ class AttendeeSerializer(serializers.ModelSerializer):
 class CalendarEventSerializer(serializers.ModelSerializer):
     # Read: return full attendee objects
     attendees = AttendeeSerializer(many=True, read_only=True)
+    lead_name = serializers.SerializerMethodField()
+    deal_title = serializers.SerializerMethodField()
+    deal_company = serializers.SerializerMethodField()
     # Write: accept a list of user PKs
     attendee_ids = serializers.PrimaryKeyRelatedField(
         many=True,
@@ -36,10 +39,14 @@ class CalendarEventSerializer(serializers.ModelSerializer):
             'attendee_ids',
             'lead',
             'deal',
+            'lead_name',
+            'deal_title',
+            'deal_company',
             'permissions',
             'reminders',
             'recurrence',
             'timezone',
+            'color',
         ]
         read_only_fields = ['user']
         extra_kwargs = {
@@ -53,6 +60,7 @@ class CalendarEventSerializer(serializers.ModelSerializer):
             'reminders': {'required': False},
             'recurrence': {'required': False},
             'timezone': {'required': False, 'allow_blank': True},
+            'color': {'required': False, 'allow_blank': True},
         }
 
     def create(self, validated_data):
@@ -71,3 +79,17 @@ class CalendarEventSerializer(serializers.ModelSerializer):
         if attendee_ids is not None:
             instance.attendees.set(attendee_ids)
         return instance
+
+    def get_lead_name(self, obj):
+        if obj.lead:
+            full_name = f"{obj.lead.first_name} {obj.lead.last_name}".strip()
+            return full_name or obj.lead.email
+        return None
+
+    def get_deal_title(self, obj):
+        return obj.deal.title if obj.deal else None
+
+    def get_deal_company(self, obj):
+        if obj.deal and obj.deal.lead:
+            return obj.deal.lead.company or None
+        return None

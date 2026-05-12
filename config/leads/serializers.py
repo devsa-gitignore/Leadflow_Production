@@ -188,3 +188,40 @@ class LogoutSerializer(serializers.Serializer):
     def save(self) -> None:
         token = RefreshToken(self.validated_data['refresh'])
         token.blacklist()
+
+
+# ---------------------------------------------------------------------------
+# User profile serializer (for read/update by the user)
+# ---------------------------------------------------------------------------
+class UserProfileSerializer(serializers.ModelSerializer):
+    role = serializers.SerializerMethodField()
+    profile_picture = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = ['id', 'first_name', 'last_name', 'email', 'phone', 'role', 'profile_picture', 'team', 'manager']
+        read_only_fields = ['id', 'email', 'role']
+
+    def get_role(self, obj):
+        return obj.role.name if obj.role else None
+
+    def get_profile_picture(self, obj):
+        try:
+            return obj.profile_picture.url if obj.profile_picture else None
+        except Exception:
+            return None
+
+    def update(self, instance, validated_data):
+        # Allow updating first/last name, phone, team, manager
+        for attr in ['first_name', 'last_name', 'phone', 'team', 'manager']:
+            if attr in validated_data:
+                setattr(instance, attr, validated_data[attr])
+
+        # Handle profile picture (may be an uploaded file)
+        request = self.context.get('request')
+        if request and hasattr(request, 'FILES') and 'profile_picture' in request.FILES:
+            instance.profile_picture = request.FILES.get('profile_picture')
+
+        instance.save()
+        return instance
+

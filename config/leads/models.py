@@ -258,6 +258,7 @@ class CalendarEvent(models.Model):
         ('call', 'Call'),
         ('meeting', 'Meeting'),
         ('reminder', 'Reminder'),
+        ('other', 'Other'),
     ]
 
     title = models.CharField(max_length=255)
@@ -284,6 +285,7 @@ class CalendarEvent(models.Model):
     sent_reminders = models.JSONField(default=list, blank=True)  # offsets already notified
     recurrence = models.JSONField(default=dict, blank=True)
     timezone = models.CharField(max_length=64, blank=True, default='')
+    color = models.CharField(max_length=20, default='#0e4d46')
 
     lead = models.ForeignKey(Lead, on_delete=models.SET_NULL, null=True, blank=True)
     deal = models.ForeignKey(Deal, on_delete=models.SET_NULL, null=True, blank=True)

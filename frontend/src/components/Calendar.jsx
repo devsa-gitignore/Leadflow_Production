@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { fetchCalendarEvents, createCalendarEvent, fetchUsers, updateCalendarEvent, deleteCalendarEvent } from '../services/calendarService';
+import { fetchPipelineData } from '../services/pipelineService';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const TIME_ZONE_OPTIONS = [
   { label: 'Browser timezone', value: '' },
@@ -122,6 +124,19 @@ const TimePicker = ({ value, onChange, disabled, format }) => {
     const timeIn24h = value || '10:00';
     return format === '12h' ? convertTo12Hour(timeIn24h) : timeIn24h;
   };
+
+  // When in 24-hour mode, prefer a typing-based input rather than the clock UI
+  if (format === '24h') {
+    return (
+      <input
+        type="time"
+        value={value || '10:00'}
+        onChange={(e) => onChange(e.target.value)}
+        disabled={disabled}
+        className="w-fit bg-white px-4 py-2 border-none rounded-xl text-sm font-semibold text-gray-700 shadow-sm focus:ring-2 focus:ring-[#0e4d46]/20 outline-none disabled:bg-gray-100 disabled:text-gray-400"
+      />
+    );
+  }
 
   const handleClockClick = (e) => {
     if (disabled) return;
@@ -414,10 +429,20 @@ const WeekView = ({ fullViewDate, today, allApiEvents, setFullViewDate, setSelec
                       key={event.id}
                       draggable
                       onDragStart={() => onEventDragStart(event.id)}
-                      className={`rounded-lg border px-2 py-2 cursor-move ${event.event_type === 'meeting' ? 'bg-[#0e4d46] text-white border-[#0e4d46]' : 'bg-[#e8f3f1] text-[#0e4d46] border-[#d1e6e3]'}`}
+                      className="rounded-lg px-2 py-2 cursor-move shadow-sm transition-transform hover:scale-[1.02]"
+                      style={{ 
+                        backgroundColor: event.color || '#0e4d46',
+                        color: 'white',
+                        borderLeft: `4px solid rgba(0,0,0,0.2)`
+                      }}
                     >
                       <p className="text-[11px] font-bold truncate">{event.title}</p>
                       <p className={`text-[10px] ${event.event_type === 'meeting' ? 'text-white/80' : 'text-[#5a827d]'}`}>{time}</p>
+                      {(event.linkedDealTitle || event.linkedLeadName) && (
+                        <p className={`text-[9px] mt-1 truncate ${event.event_type === 'meeting' ? 'text-white/70' : 'text-[#5a827d]'}`}>
+                          {event.linkedDealTitle || event.linkedLeadName}
+                        </p>
+                      )}
                     </div>
                   );
                 })}
@@ -480,7 +505,11 @@ const MonthView = ({ fYear, fMonth, fFirstDay, fDaysIn, events, selectedDayFull,
                     key={i}
                     draggable
                     onDragStart={() => onEventDragStart(event.id)}
-                    className={`px-2 py-1.5 rounded-md text-[9px] font-bold truncate transition-all cursor-move ${event.type === 'primary' ? 'bg-[#0e4d46] text-white' : 'bg-[#e8f3f1] text-[#0e4d46] border border-[#d1e6e3]'}`}
+                    className="px-2 py-1.5 rounded-md text-[9px] font-bold truncate transition-all cursor-move shadow-sm"
+                    style={{ 
+                      backgroundColor: event.color || '#0e4d46',
+                      color: 'white'
+                    }}
                   >
                     {event.title}
                   </div>
@@ -512,7 +541,32 @@ const mapApiMiniTasks = (apiEvents) => {
   return tasks;
 };
 
-const CreateEventView = ({ onSave, onCancel, onDelete, initialData }) => {
+const buildDealOptions = (pipelineData) => {
+  if (!pipelineData || !Array.isArray(pipelineData.pipeline)) return [];
+
+  return pipelineData.pipeline.flatMap((stage) => {
+    if (!Array.isArray(stage.deals)) return [];
+
+    return stage.deals.map((deal) => ({
+      id: deal.id,
+      label: `${deal.company || deal.title} — ${deal.title}`,
+      leadId: deal.lead_id,
+      leadName: deal.lead_name || '',
+      company: deal.company || '',
+    }));
+  });
+};
+
+const EVENT_COLORS = [
+  { label: 'Deep Teal', value: '#0e4d46' },
+  { label: 'Emerald', value: '#10b981' },
+  { label: 'Amethyst', value: '#8b5cf6' },
+  { label: 'Amber', value: '#f59e0b' },
+  { label: 'Rose', value: '#f43f5e' },
+  { label: 'Sky', value: '#0ea5e9' },
+];
+
+const CreateEventView = ({ onSave, onCancel, onDelete, initialData, dealOptions }) => {
   const isEdit = !!initialData;
 
   const [title, setTitle] = useState(initialData?.title || '');
@@ -532,6 +586,10 @@ const CreateEventView = ({ onSave, onCancel, onDelete, initialData }) => {
   const [location, setLocation] = useState(initialData?.location || '');
   const [meetingLink, setMeetingLink] = useState(initialData?.meetingLink || '');
   const [description, setDescription] = useState(initialData?.description || '');
+  const [selectedDealId, setSelectedDealId] = useState(initialData?.deal ? String(initialData.deal) : '');
+  const [selectedLeadId, setSelectedLeadId] = useState(initialData?.lead ? String(initialData.lead) : '');
+  const [color, setColor] = useState(initialData?.color || '#0e4d46');
+  const [eventType, setEventType] = useState(initialData?.event_type || 'meeting');
 
   // Attendees — pre-fill from initialData
   const [guestQuery, setGuestQuery] = useState('');
@@ -564,6 +622,14 @@ const CreateEventView = ({ onSave, onCancel, onDelete, initialData }) => {
   const [recurrence, setRecurrence] = useState(initialData?.recurrence || { frequency: 'none' });
   const [timeZone, setTimeZone] = useState(initialData?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone);
 
+  useEffect(() => {
+    if (!selectedDealId) return;
+    const matchedDeal = dealOptions.find((deal) => String(deal.id) === selectedDealId);
+    if (matchedDeal?.leadId && String(matchedDeal.leadId) !== selectedLeadId) {
+      setSelectedLeadId(String(matchedDeal.leadId));
+    }
+  }, [dealOptions, selectedDealId, selectedLeadId]);
+
   const addAttendee = (user) => {
     setSelectedAttendees(prev => [...prev, user]);
     setGuestQuery('');
@@ -585,6 +651,15 @@ const CreateEventView = ({ onSave, onCancel, onDelete, initialData }) => {
 
   const handleSave = (e) => {
     e.preventDefault();
+
+    // Timing Validation
+    const start = new Date(`${startDate}T${startTime}`);
+    const end = new Date(`${endDate}T${endTime}`);
+    if (end <= start) {
+      alert('Senseless timings! The event must end after it starts.');
+      return;
+    }
+
     onSave({
       title: title || 'Untitled Event',
       startDate,
@@ -600,6 +675,10 @@ const CreateEventView = ({ onSave, onCancel, onDelete, initialData }) => {
       reminders,
       recurrence,
       timezone: timeZone,
+      dealId: selectedDealId ? Number(selectedDealId) : null,
+      leadId: selectedLeadId ? Number(selectedLeadId) : null,
+      color,
+      eventType,
     });
   };
 
@@ -608,13 +687,27 @@ const CreateEventView = ({ onSave, onCancel, onDelete, initialData }) => {
       {/* Left Form Area */}
       <div className="flex-1 flex flex-col pl-8 pr-16 pb-8 space-y-8">
         
-        <input 
-          type="text" 
-          placeholder="Add title" 
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          className="w-full bg-transparent text-4xl mt-4 font-bold text-[#0e4d46] placeholder:text-[#a3c2c0] border-none outline-none focus:ring-0 px-0"
-        />
+        <div className="flex items-center gap-6 mt-4">
+          <input 
+            type="text" 
+            placeholder="Add title" 
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            className="flex-1 bg-transparent text-4xl font-bold text-[#0e4d46] placeholder:text-[#a3c2c0] border-none outline-none focus:ring-0 px-0"
+          />
+          <div className="flex items-center gap-2">
+            {EVENT_COLORS.map((c) => (
+              <button
+                key={c.value}
+                type="button"
+                onClick={() => setColor(c.value)}
+                className={`w-8 h-8 rounded-full border-2 transition-all ${color === c.value ? 'border-[#0e4d46] scale-110 shadow-md' : 'border-transparent hover:scale-105'}`}
+                style={{ backgroundColor: c.value }}
+                title={c.label}
+              />
+            ))}
+          </div>
+        </div>
 
         {/* Date and Time */}
         <div className="flex items-start gap-4 text-[#5a827d]">
@@ -627,6 +720,16 @@ const CreateEventView = ({ onSave, onCancel, onDelete, initialData }) => {
           
           <div className="flex flex-col space-y-3 flex-1">
             <div className="flex items-center gap-4">
+              <select
+                value={eventType}
+                onChange={(e) => setEventType(e.target.value)}
+                className="w-fit bg-white px-4 py-2 border-none rounded-xl text-sm font-bold text-[#0e4d46] shadow-sm focus:ring-2 focus:ring-[#0e4d46]/20 outline-none cursor-pointer"
+              >
+                <option value="meeting">Meeting</option>
+                <option value="call">Call</option>
+                <option value="reminder">Reminder</option>
+                <option value="other">Other</option>
+              </select>
               <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="w-fit bg-white px-4 py-2 border-none rounded-xl text-sm font-semibold text-gray-700 shadow-sm focus:ring-2 focus:ring-[#0e4d46]/20 outline-none" placeholder="DD/MM/YYYY" />
               <TimePicker value={startTime} onChange={setStartTime} disabled={allDay} format={timeFormat} />
               <span className="text-gray-400 font-bold">—</span>
@@ -694,6 +797,37 @@ const CreateEventView = ({ onSave, onCancel, onDelete, initialData }) => {
             onChange={(e) => setMeetingLink(e.target.value)}
             className="flex-1 bg-white px-4 py-3 border-none rounded-xl text-sm font-medium text-gray-700 placeholder:text-gray-400 shadow-sm focus:ring-2 focus:ring-[#0e4d46]/20 outline-none"
           />
+        </div>
+
+        {/* Linked CRM Record */}
+        <div className="flex items-start gap-4 text-[#5a827d]">
+          <div className="mt-2 text-[#a3c2c0]">
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.828 10.172a4 4 0 010 5.656l-3 3a4 4 0 01-5.656-5.656l1.5-1.5m11.156-1.5a4 4 0 010 5.656l-1.5 1.5m-5.656-11.156a4 4 0 015.656 0l3 3a4 4 0 01-5.656 5.656l-1.5-1.5" />
+            </svg>
+          </div>
+          <div className="flex-1 space-y-3">
+            <select
+              value={selectedDealId}
+              onChange={(e) => {
+                const nextDealId = e.target.value;
+                setSelectedDealId(nextDealId);
+                const matchedDeal = dealOptions.find((deal) => String(deal.id) === nextDealId);
+                setSelectedLeadId(matchedDeal?.leadId ? String(matchedDeal.leadId) : '');
+              }}
+              className="w-full bg-white px-4 py-3 border-none rounded-xl text-sm font-medium text-gray-700 placeholder:text-gray-400 shadow-sm focus:ring-2 focus:ring-[#0e4d46]/20 outline-none"
+            >
+              <option value="">Link to a deal (optional)</option>
+              {dealOptions.map((deal) => (
+                <option key={deal.id} value={String(deal.id)}>{deal.label}</option>
+              ))}
+            </select>
+            <div className="flex flex-wrap gap-2 text-[10px] font-bold uppercase tracking-widest">
+              <span className="px-3 py-1 rounded-full bg-[#f0f7f6] text-[#0e4d46]">
+                Lead: {selectedLeadId || 'Not linked'}
+              </span>
+            </div>
+          </div>
         </div>
 
         {/* Description / Attachments */}
@@ -876,8 +1010,16 @@ const Calendar = ({ variant = 'mini' }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState('all');
   const [filterAttendee, setFilterAttendee] = useState('all');
+  const [filterColor, setFilterColor] = useState('all');
+  const [isOverTrash, setIsOverTrash] = useState(false);
   const [draggingEventId, setDraggingEventId] = useState(null);
   const [dragOverKey, setDragOverKey] = useState(null);
+  const [dealOptions, setDealOptions] = useState([]);
+
+  const dealLookup = dealOptions.reduce((acc, deal) => {
+    acc[String(deal.id)] = deal;
+    return acc;
+  }, {});
 
   // Map API events array → { [dayOfMonth]: [eventObj, ...] } keyed to fullViewDate month/year
   const mapApiEvents = (apiEvents, refDate) => {
@@ -916,6 +1058,12 @@ const Calendar = ({ variant = 'mini' }) => {
         reminders: Array.isArray(ev.reminders) ? ev.reminders : [],
         recurrence: ev.recurrence || {},
         timezone: ev.timezone || '',
+        color: ev.color || '#0e4d46',
+        lead: ev.lead || null,
+        deal: ev.deal || null,
+        linkedLeadName: ev.lead_name || '',
+        linkedDealTitle: ev.deal_title || '',
+        linkedDealCompany: ev.deal_company || '',
         // Keep raw date/time strings for edit pre-fill in the selected timezone
         startDate: `${startParts.year}-${String(startParts.month).padStart(2,'0')}-${String(startParts.day).padStart(2,'0')}`,
         endDate: `${endParts.year}-${String(endParts.month).padStart(2,'0')}-${String(endParts.day).padStart(2,'0')}`,
@@ -950,6 +1098,7 @@ const Calendar = ({ variant = 'mini' }) => {
       const matchesAttendee =
         filterAttendee === 'all' ||
         (ev.attendees || []).some((a) => String(a.id) === filterAttendee);
+      const matchesColor = filterColor === 'all' || ev.color === filterColor;
 
       const textBlob = [
         ev.title,
@@ -963,7 +1112,7 @@ const Calendar = ({ variant = 'mini' }) => {
         .toLowerCase();
 
       const matchesSearch = !q || textBlob.includes(q);
-      return matchesType && matchesAttendee && matchesSearch;
+      return matchesType && matchesAttendee && matchesColor && matchesSearch;
     });
   };
 
@@ -980,9 +1129,23 @@ const Calendar = ({ variant = 'mini' }) => {
     }
   }, []);
 
+  const loadDealOptions = useCallback(async () => {
+    try {
+      const data = await fetchPipelineData();
+      setDealOptions(buildDealOptions(data));
+    } catch (err) {
+      console.error('Failed to load deal options', err);
+      setDealOptions([]);
+    }
+  }, []);
+
   useEffect(() => {
     loadEvents();
   }, [loadEvents]);
+
+  useEffect(() => {
+    loadDealOptions();
+  }, [loadDealOptions]);
 
   const getCalendarInfo = (date) => {
     const month = date.getMonth();
@@ -1018,7 +1181,11 @@ const Calendar = ({ variant = 'mini' }) => {
     for (let i = 1; i <= daysIn; i++) dates.push(i);
 
     return (
-      <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex flex-col h-fit">
+      <motion.div 
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex flex-col h-fit"
+      >
         <div className="flex justify-between items-center mb-6">
           <h3 className="text-sm font-bold text-[#0e4d46] tracking-wider">{monthName} {year}</h3>
           <div className="flex gap-2">
@@ -1049,7 +1216,7 @@ const Calendar = ({ variant = 'mini' }) => {
             ))}
           </div>
         </div>
-      </div>
+      </motion.div>
     );
   }
 
@@ -1134,6 +1301,24 @@ const Calendar = ({ variant = 'mini' }) => {
     }
   };
 
+  const handleTrashDrop = async (e) => {
+    e.preventDefault();
+    if (!draggingEventId) return;
+    const dragged = allApiEvents.find((ev) => ev.id === draggingEventId);
+    if (!dragged) return;
+
+    if (window.confirm(`Delete "${dragged.title}"?`)) {
+      try {
+        await deleteCalendarEvent(dragged.id);
+        await loadEvents();
+      } catch (err) {
+        console.error('Failed to delete event via trashcan', err);
+      }
+    }
+    setDraggingEventId(null);
+    setIsOverTrash(false);
+  };
+
   if (isCreateViewOpen || editingEvent) {
     // Build initialData from editingEvent for pre-filling the form
     const initialData = editingEvent ? {
@@ -1150,13 +1335,23 @@ const Calendar = ({ variant = 'mini' }) => {
       attendees: editingEvent.attendees || [],
       permissions: editingEvent.permissions || {},
       reminders: editingEvent.reminders || [],
+      lead: editingEvent.lead || null,
+      deal: editingEvent.deal || null,
+      color: editingEvent.color || '#0e4d46',
+      event_type: editingEvent.event_type || 'meeting',
     } : null;
 
     return (
-      <div className="bg-[#eef6f4] min-h-screen relative">
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.98 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.98 }}
+        className="bg-[#eef6f4] min-h-screen relative"
+      >
         <CreateEventView
           initialData={initialData}
-          onSave={async ({ title, startDate, endDate, startTime, endTime, allDay, location, meetingLink, description, attendeeIds, permissions, reminders, recurrence, timezone }) => {
+          dealOptions={dealOptions}
+          onSave={async ({ title, startDate, endDate, startTime, endTime, allDay, location, meetingLink, description, attendeeIds, permissions, reminders, recurrence, timezone, leadId, dealId, color, eventType }) => {
             try {
               const payload = {
                 title: title || 'Untitled Event',
@@ -1166,11 +1361,14 @@ const Calendar = ({ variant = 'mini' }) => {
                 location: location || '',
                 meeting_link: meetingLink || '',
                 description: description || '',
-                event_type: 'meeting',
+                event_type: eventType || 'meeting',
                 attendee_ids: attendeeIds || [],
                 permissions: permissions || {},
                 reminders: reminders || [],
                 timezone: timezone || '',
+                lead: leadId || null,
+                deal: dealId || null,
+                color: color || '#0e4d46',
               };
               // include optional recurrence if provided
               if (recurrence) payload.recurrence = recurrence;
@@ -1198,9 +1396,8 @@ const Calendar = ({ variant = 'mini' }) => {
               alert('Failed to delete event. Please try again.');
             }
           } : undefined}
-          onCancel={() => { setIsCreateViewOpen(false); setEditingEvent(null); }}
-        />
-      </div>
+          />
+      </motion.div>
     );
   }
 
@@ -1244,6 +1441,7 @@ const Calendar = ({ variant = 'mini' }) => {
                 <option value="meeting">Meeting</option>
                 <option value="call">Call</option>
                 <option value="reminder">Reminder</option>
+                <option value="other">Other</option>
               </select>
               <select
                 value={filterAttendee}
@@ -1255,12 +1453,23 @@ const Calendar = ({ variant = 'mini' }) => {
                   <option key={a.id} value={String(a.id)}>{a.name}</option>
                 ))}
               </select>
-              {(searchQuery || filterType !== 'all' || filterAttendee !== 'all') && (
+              <select
+                value={filterColor}
+                onChange={(e) => setFilterColor(e.target.value)}
+                className="px-3 py-2 rounded-lg border border-gray-200 text-xs font-bold text-[#0e4d46] bg-white focus:outline-none focus:ring-2 focus:ring-[#0e4d46]/20"
+              >
+                <option value="all">All Colors</option>
+                {EVENT_COLORS.map((c) => (
+                  <option key={c.value} value={c.value}>{c.label}</option>
+                ))}
+              </select>
+              {(searchQuery || filterType !== 'all' || filterAttendee !== 'all' || filterColor !== 'all') && (
                 <button
                   onClick={() => {
                     setSearchQuery('');
                     setFilterType('all');
                     setFilterAttendee('all');
+                    setFilterColor('all');
                   }}
                   className="px-3 py-2 rounded-lg border border-gray-200 text-xs font-bold text-[#5a827d] hover:text-[#0e4d46] hover:border-[#0e4d46] transition-all"
                 >
@@ -1276,10 +1485,20 @@ const Calendar = ({ variant = 'mini' }) => {
           </div>
         </div>
 
-        {view === 'Year' ? <YearView fYear={fYear} today={today} getCalendarInfo={getCalendarInfo} /> : 
-          view === 'Day' ? <DayView selectedDayFull={selectedDayFull} fullViewDate={fullViewDate} fYear={fYear} events={events} /> : 
-          view === 'Week' ? <WeekView fullViewDate={fullViewDate} today={today} allApiEvents={filteredApiEvents} setFullViewDate={setFullViewDate} setSelectedDayFull={setSelectedDayFull} onEventDragStart={handleEventDragStart} onDayDrop={handleEventDropToDate} dragOverKey={dragOverKey} setDragOverKey={setDragOverKey} /> :
-          <MonthView fYear={fYear} fMonth={fMonth} fFirstDay={fFirstDay} fDaysIn={fDaysIn} events={events} selectedDayFull={selectedDayFull} setSelectedDayFull={setSelectedDayFull} today={today} daysOfWeek={daysOfWeek} onEventDragStart={handleEventDragStart} onDayDrop={handleEventDropToDate} dragOverKey={dragOverKey} setDragOverKey={setDragOverKey} />}
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={view + fullViewDate.getTime()}
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+            transition={{ duration: 0.2 }}
+          >
+            {view === 'Year' ? <YearView fYear={fYear} today={today} getCalendarInfo={getCalendarInfo} /> : 
+              view === 'Day' ? <DayView selectedDayFull={selectedDayFull} fullViewDate={fullViewDate} fYear={fYear} events={events} /> : 
+              view === 'Week' ? <WeekView fullViewDate={fullViewDate} today={today} allApiEvents={filteredApiEvents} setFullViewDate={setFullViewDate} setSelectedDayFull={setSelectedDayFull} onEventDragStart={handleEventDragStart} onDayDrop={handleEventDropToDate} dragOverKey={dragOverKey} setDragOverKey={setDragOverKey} /> :
+              <MonthView fYear={fYear} fMonth={fMonth} fFirstDay={fFirstDay} fDaysIn={fDaysIn} events={events} selectedDayFull={selectedDayFull} setSelectedDayFull={setSelectedDayFull} today={today} daysOfWeek={daysOfWeek} onEventDragStart={handleEventDragStart} onDayDrop={handleEventDropToDate} dragOverKey={dragOverKey} setDragOverKey={setDragOverKey} />}
+          </motion.div>
+        </AnimatePresence>
 
         {view !== 'Year' && (
           <div className="bg-[#f0f7f6] p-8 border-t border-gray-100 min-h-[300px]">
@@ -1324,6 +1543,9 @@ const Calendar = ({ variant = 'mini' }) => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
                 <div className="space-y-6">
                   <div><p className="text-[10px] font-extrabold text-[#5a827d] uppercase tracking-widest mb-2">TIME & DATE</p><p className="text-sm font-bold text-[#0e4d46]">{activeEvent.time} | {selectedDayFull} {fMonthName}</p><p className="text-[10px] font-semibold text-[#5a827d] mt-1">{activeEvent.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone}</p></div>
+                  <div><p className="text-[10px] font-extrabold text-[#5a827d] uppercase tracking-widest mb-2">EVENT TYPE</p>
+                    <p className="text-sm font-bold text-[#0e4d46] uppercase tracking-wider">{activeEvent.event_type || 'Meeting'}</p>
+                  </div>
                   <div><p className="text-[10px] font-extrabold text-[#5a827d] uppercase tracking-widest mb-2">LOCATION</p>
                     <p className="text-sm font-bold text-[#0e4d46]">{activeEvent.location || 'Not set'}</p>
                   </div>
@@ -1333,6 +1555,13 @@ const Calendar = ({ variant = 'mini' }) => {
                     ) : (
                       <p className="text-sm font-bold text-[#5a827d]">Not set</p>
                     )}
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-extrabold text-[#5a827d] uppercase tracking-widest mb-2">LINKED CRM RECORD</p>
+                    <div className="space-y-2 text-sm font-bold text-[#0e4d46]">
+                      <p>Deal: {activeEvent.linkedDealTitle || (activeEvent.deal ? dealLookup[String(activeEvent.deal)]?.label : null) || 'Not linked'}</p>
+                      <p>Lead: {activeEvent.linkedLeadName || (activeEvent.deal ? dealLookup[String(activeEvent.deal)]?.leadName : null) || (activeEvent.lead ? `Lead #${activeEvent.lead}` : 'Not linked')}</p>
+                    </div>
                   </div>
                 </div>
                 <div className="space-y-6">
@@ -1358,6 +1587,35 @@ const Calendar = ({ variant = 'mini' }) => {
           </div>
         )}
       </div>
+
+      {/* Trashcan */}
+      <motion.div 
+        id="trash-bin"
+        animate={{ 
+          scale: draggingEventId ? (isOverTrash ? 1.3 : 1) : 0,
+          opacity: draggingEventId ? 1 : 0,
+          x: isOverTrash ? [-1, 1, -1, 1, 0] : 0,
+          y: draggingEventId ? 0 : 100,
+        }}
+        transition={{
+          x: { repeat: Infinity, duration: 0.2 },
+          scale: { type: "spring", stiffness: 300, damping: 20 },
+          opacity: { duration: 0.2 },
+          y: { type: "spring", stiffness: 300, damping: 25 }
+        }}
+        onDragOver={(e) => {
+          e.preventDefault();
+          if (!isOverTrash) setIsOverTrash(true);
+        }}
+        onDragLeave={() => setIsOverTrash(false)}
+        onDrop={handleTrashDrop}
+        className={`fixed bottom-6 right-6 md:bottom-10 md:right-10 w-14 h-14 bg-white/90 backdrop-blur-sm rounded-full flex justify-center items-center shadow-[0_8px_30px_rgb(0,0,0,0.12)] border-[2.5px] border-dashed transition-colors duration-300 z-[100] group overflow-hidden ${isOverTrash ? 'border-red-500 bg-red-50' : 'border-red-300'}`}
+      >
+        <div className={`absolute inset-0 bg-red-100 transition-opacity ${isOverTrash ? 'opacity-40' : 'opacity-0'}`}></div>
+        <svg className={`w-6 h-6 relative pointer-events-none transition-all duration-300 z-10 ${isOverTrash ? 'text-red-600 rotate-12 scale-110' : 'text-red-500'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+        </svg>
+      </motion.div>
     </div>
   );
 };
