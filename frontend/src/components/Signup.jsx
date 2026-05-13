@@ -22,7 +22,7 @@ const Signup = () => {
   const validate = () => {
     const newErrors = {};
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&_\-#]).{8,}$/;
 
     if (!formData.fullName.trim()) {
       newErrors.fullName = 'Full Name is required';
@@ -41,7 +41,7 @@ const Signup = () => {
     if (!formData.password) {
       newErrors.password = 'Password is required';
     } else if (!passwordRegex.test(formData.password)) {
-      newErrors.password = 'Password must be at least 8 characters, include uppercase, lowercase, and a number';
+      newErrors.password = 'Password must be at least 8 characters, include uppercase, lowercase, a number, and a special character (@$!%*?&_-#)';
     }
 
     if (formData.password !== formData.confirmPassword) {
@@ -67,7 +67,8 @@ const Signup = () => {
         // Navigate to login so user can sign in manually
         navigate('/login', { state: { message: 'Account created! Please log in.' } });
       } catch (err) {
-        setErrors({ ...errors, email: err.message });
+        // If it's a validation error from backend, it will be in the message
+        setErrors({ ...errors, submit: err.message });
       } finally {
         setIsLoading(false);
       }
@@ -92,6 +93,15 @@ const Signup = () => {
             <h1 className="text-3xl font-bold text-primary mb-2">Create an account</h1>
             <p className="text-muted text-sm font-medium">Enter your details below to get started.</p>
           </div>
+
+          {errors.submit && (
+            <div className="mb-6 p-4 bg-red-50 border border-red-100 rounded-xl flex items-center gap-3 text-red-600 animate-in fade-in slide-in-from-top-2 duration-300">
+              <svg className="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <p className="text-xs font-bold">{errors.submit}</p>
+            </div>
+          )}
 
           <form onSubmit={handleSubmit} className="space-y-5">
             {/* POSITION/ROLE TOGGLE */}

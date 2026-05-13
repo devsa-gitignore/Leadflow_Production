@@ -4,105 +4,35 @@ import { fetchCalendarEvents, createCalendarEvent, fetchUsers, updateCalendarEve
 import { fetchPipelineData } from '../services/pipelineService';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const TIME_ZONE_OPTIONS = [
-  { label: 'Browser timezone', value: '' },
-  { label: 'UTC', value: 'UTC' },
-  { label: 'America/New_York', value: 'America/New_York' },
-  { label: 'America/Chicago', value: 'America/Chicago' },
-  { label: 'America/Denver', value: 'America/Denver' },
-  { label: 'America/Los_Angeles', value: 'America/Los_Angeles' },
-  { label: 'Europe/London', value: 'Europe/London' },
-  { label: 'Europe/Paris', value: 'Europe/Paris' },
-  { label: 'Asia/Dubai', value: 'Asia/Dubai' },
-  { label: 'Asia/Kolkata', value: 'Asia/Kolkata' },
-  { label: 'Asia/Singapore', value: 'Asia/Singapore' },
-  { label: 'Australia/Sydney', value: 'Australia/Sydney' },
-];
-
-const getDateTimePartsInZone = (value, timeZone) => {
+const getDateTimeParts = (value) => {
   const date = new Date(value);
-  if (!timeZone) {
-    return {
-      year: date.getFullYear(),
-      month: date.getMonth() + 1,
-      day: date.getDate(),
-      hour: date.getHours(),
-      minute: date.getMinutes(),
-      second: date.getSeconds(),
-    };
-  }
-
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hourCycle: 'h23',
-  }).formatToParts(date).reduce((acc, part) => {
-    acc[part.type] = part.value;
-    return acc;
-  }, {});
-
   return {
-    year: Number(parts.year),
-    month: Number(parts.month),
-    day: Number(parts.day),
-    hour: Number(parts.hour),
-    minute: Number(parts.minute),
-    second: Number(parts.second),
+    year: date.getFullYear(),
+    month: date.getMonth() + 1,
+    day: date.getDate(),
+    hour: date.getHours(),
+    minute: date.getMinutes(),
+    second: date.getSeconds(),
   };
 };
 
-const formatTimeInZone = (value, timeZone) => {
+const formatTime = (value) => {
   const date = new Date(value);
   return new Intl.DateTimeFormat('default', {
-    timeZone: timeZone || undefined,
     hour: '2-digit',
     minute: '2-digit',
   }).format(date);
 };
 
-const getDateKeyInZone = (value, timeZone) => {
-  const { year, month, day } = getDateTimePartsInZone(value, timeZone);
+const getDateKey = (value) => {
+  const { year, month, day } = getDateTimeParts(value);
   return `${year}-${month}-${day}`;
 };
 
-const buildIsoFromZoneParts = (dateString, timeString, timeZone) => {
+const buildIsoFromDateTime = (dateString, timeString) => {
   const [year, month, day] = dateString.split('-').map(Number);
   const [hour, minute] = timeString.split(':').map(Number);
-  const utcGuess = new Date(Date.UTC(year, month - 1, day, hour, minute, 0));
-
-  if (!timeZone) {
-    return utcGuess.toISOString();
-  }
-
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hourCycle: 'h23',
-  }).formatToParts(utcGuess).reduce((acc, part) => {
-    acc[part.type] = part.value;
-    return acc;
-  }, {});
-
-  const zonedAsUtc = Date.UTC(
-    Number(parts.year),
-    Number(parts.month) - 1,
-    Number(parts.day),
-    Number(parts.hour),
-    Number(parts.minute),
-    Number(parts.second),
-  );
-
-  return new Date(utcGuess.getTime() - (zonedAsUtc - utcGuess.getTime())).toISOString();
+  return new Date(year, month - 1, day, hour, minute, 0).toISOString();
 };
 
 // Time format converters
@@ -370,7 +300,7 @@ const WeekView = ({ fullViewDate, today, allApiEvents, setFullViewDate, setSelec
 
   const eventsByDate = {};
   allApiEvents.forEach((ev) => {
-    const key = getDateKeyInZone(ev.start_time, ev.timezone);
+    const key = getDateKey(ev.start_time);
     if (!eventsByDate[key]) eventsByDate[key] = [];
     eventsByDate[key].push(ev);
   });
@@ -422,7 +352,7 @@ const WeekView = ({ fullViewDate, today, allApiEvents, setFullViewDate, setSelec
                   const end = new Date(event.end_time);
                   const time = event.all_day
                     ? 'All day'
-                    : `${formatTimeInZone(start, event.timezone)} - ${formatTimeInZone(end, event.timezone)}`;
+                    : `${formatTime(start)} - ${formatTime(end)}`;
 
                   return (
                     <div
@@ -534,7 +464,7 @@ const REMINDER_OPTIONS = [
 const mapApiMiniTasks = (apiEvents) => {
   const tasks = {};
   apiEvents.forEach((ev) => {
-    const key = getDateKeyInZone(ev.start_time, ev.timezone);
+    const key = getDateKey(ev.start_time);
     if (!tasks[key]) tasks[key] = [];
     tasks[key].push(ev.title);
   });
@@ -620,7 +550,6 @@ const CreateEventView = ({ onSave, onCancel, onDelete, initialData, dealOptions 
   }, [guestQuery, selectedAttendees]);
 
   const [recurrence, setRecurrence] = useState(initialData?.recurrence || { frequency: 'none' });
-  const [timeZone, setTimeZone] = useState(initialData?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone);
 
   useEffect(() => {
     if (!selectedDealId) return;
@@ -674,7 +603,6 @@ const CreateEventView = ({ onSave, onCancel, onDelete, initialData, dealOptions 
       permissions: { canInvite, canSeeList, canModify },
       reminders,
       recurrence,
-      timezone: timeZone,
       dealId: selectedDealId ? Number(selectedDealId) : null,
       leadId: selectedLeadId ? Number(selectedLeadId) : null,
       color,
@@ -753,15 +681,6 @@ const CreateEventView = ({ onSave, onCancel, onDelete, initialData, dealOptions 
                 <input type="checkbox" checked={allDay} onChange={e => setAllDay(e.target.checked)} className="rounded border-gray-300 text-[#0e4d46] focus:ring-[#0e4d46] w-4 h-4 cursor-pointer" />
                 <span className="text-sm font-bold text-gray-600">All day</span>
               </label>
-              <select
-                value={timeZone}
-                onChange={(e) => setTimeZone(e.target.value)}
-                className="w-full sm:w-auto bg-white px-4 py-2 border-none rounded-xl text-sm font-semibold text-gray-700 shadow-sm focus:ring-2 focus:ring-[#0e4d46]/20 outline-none"
-              >
-                {TIME_ZONE_OPTIONS.map((option) => (
-                  <option key={option.value || 'browser'} value={option.value}>{option.label}</option>
-                ))}
-              </select>
             </div>
           </div>
         </div>
@@ -1025,13 +944,13 @@ const Calendar = ({ variant = 'mini' }) => {
   const mapApiEvents = (apiEvents, refDate) => {
     const mapped = {};
     apiEvents.forEach(ev => {
-      const startParts = getDateTimePartsInZone(ev.start_time, ev.timezone);
-      const endParts = getDateTimePartsInZone(ev.end_time, ev.timezone);
+      const startParts = getDateTimeParts(ev.start_time);
+      const endParts = getDateTimeParts(ev.end_time);
       // Only include events in the currently viewed month/year
       if (startParts.year !== refDate.getFullYear() || startParts.month - 1 !== refDate.getMonth()) return;
       const day = startParts.day;
       const hour = startParts.hour;
-      const fmt = (value) => formatTimeInZone(value, ev.timezone);
+      const fmt = (value) => formatTime(value);
       const attendees = (ev.attendees || []).map(a => ({
         // Keep full API shape so edit form can send attendee_ids correctly
         id: a.id,
@@ -1057,14 +976,13 @@ const Calendar = ({ variant = 'mini' }) => {
         permissions: ev.permissions || {},
         reminders: Array.isArray(ev.reminders) ? ev.reminders : [],
         recurrence: ev.recurrence || {},
-        timezone: ev.timezone || '',
         color: ev.color || '#0e4d46',
         lead: ev.lead || null,
         deal: ev.deal || null,
         linkedLeadName: ev.lead_name || '',
         linkedDealTitle: ev.deal_title || '',
         linkedDealCompany: ev.deal_company || '',
-        // Keep raw date/time strings for edit pre-fill in the selected timezone
+        // Keep raw date/time strings for edit pre-fill
         startDate: `${startParts.year}-${String(startParts.month).padStart(2,'0')}-${String(startParts.day).padStart(2,'0')}`,
         endDate: `${endParts.year}-${String(endParts.month).padStart(2,'0')}-${String(endParts.day).padStart(2,'0')}`,
         startTime: `${String(startParts.hour).padStart(2,'0')}:${String(startParts.minute).padStart(2,'0')}`,
@@ -1277,8 +1195,6 @@ const Calendar = ({ variant = 'mini' }) => {
     const oldStart = new Date(dragged.start_time);
     const oldEnd = new Date(dragged.end_time);
     const durationMs = Math.max(oldEnd.getTime() - oldStart.getTime(), 0);
-    const eventZone = dragged.timezone || '';
-
     const newStart = new Date(targetDate);
     newStart.setHours(oldStart.getHours(), oldStart.getMinutes(), oldStart.getSeconds(), 0);
 
@@ -1286,8 +1202,8 @@ const Calendar = ({ variant = 'mini' }) => {
 
     try {
       await updateCalendarEvent(dragged.id, {
-        start_time: buildIsoFromZoneParts(`${newStart.getFullYear()}-${String(newStart.getMonth() + 1).padStart(2, '0')}-${String(newStart.getDate()).padStart(2, '0')}`, `${String(newStart.getHours()).padStart(2, '0')}:${String(newStart.getMinutes()).padStart(2, '0')}`, eventZone),
-        end_time: buildIsoFromZoneParts(`${newEnd.getFullYear()}-${String(newEnd.getMonth() + 1).padStart(2, '0')}-${String(newEnd.getDate()).padStart(2, '0')}`, `${String(newEnd.getHours()).padStart(2, '0')}:${String(newEnd.getMinutes()).padStart(2, '0')}`, eventZone),
+        start_time: buildIsoFromDateTime(`${newStart.getFullYear()}-${String(newStart.getMonth() + 1).padStart(2, '0')}-${String(newStart.getDate()).padStart(2, '0')}`, `${String(newStart.getHours()).padStart(2, '0')}:${String(newStart.getMinutes()).padStart(2, '0')}`),
+        end_time: buildIsoFromDateTime(`${newEnd.getFullYear()}-${String(newEnd.getMonth() + 1).padStart(2, '0')}-${String(newEnd.getDate()).padStart(2, '0')}`, `${String(newEnd.getHours()).padStart(2, '0')}:${String(newEnd.getMinutes()).padStart(2, '0')}`),
       });
 
       setFullViewDate(new Date(targetDate));
@@ -1327,7 +1243,6 @@ const Calendar = ({ variant = 'mini' }) => {
       endDate: editingEvent.endDate,
       startTime: editingEvent.startTime,
       endTime: editingEvent.endTime,
-      timezone: editingEvent.timezone || '',
       allDay: editingEvent.allDay,
       location: editingEvent.location,
       meetingLink: editingEvent.meetingLink,
@@ -1351,12 +1266,12 @@ const Calendar = ({ variant = 'mini' }) => {
         <CreateEventView
           initialData={initialData}
           dealOptions={dealOptions}
-          onSave={async ({ title, startDate, endDate, startTime, endTime, allDay, location, meetingLink, description, attendeeIds, permissions, reminders, recurrence, timezone, leadId, dealId, color, eventType }) => {
+          onSave={async ({ title, startDate, endDate, startTime, endTime, allDay, location, meetingLink, description, attendeeIds, permissions, reminders, recurrence, leadId, dealId, color, eventType }) => {
             try {
               const payload = {
                 title: title || 'Untitled Event',
-                start_time: buildIsoFromZoneParts(startDate, startTime, timezone),
-                end_time: buildIsoFromZoneParts(endDate, endTime, timezone),
+                start_time: buildIsoFromDateTime(startDate, startTime),
+                end_time: buildIsoFromDateTime(endDate, endTime),
                 all_day: !!allDay,
                 location: location || '',
                 meeting_link: meetingLink || '',
@@ -1365,7 +1280,6 @@ const Calendar = ({ variant = 'mini' }) => {
                 attendee_ids: attendeeIds || [],
                 permissions: permissions || {},
                 reminders: reminders || [],
-                timezone: timezone || '',
                 lead: leadId || null,
                 deal: dealId || null,
                 color: color || '#0e4d46',
@@ -1542,7 +1456,7 @@ const Calendar = ({ variant = 'mini' }) => {
             {selectedDayEvents.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
                 <div className="space-y-6">
-                  <div><p className="text-[10px] font-extrabold text-[#5a827d] uppercase tracking-widest mb-2">TIME & DATE</p><p className="text-sm font-bold text-[#0e4d46]">{activeEvent.time} | {selectedDayFull} {fMonthName}</p><p className="text-[10px] font-semibold text-[#5a827d] mt-1">{activeEvent.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone}</p></div>
+                  <div><p className="text-[10px] font-extrabold text-[#5a827d] uppercase tracking-widest mb-2">TIME & DATE</p><p className="text-sm font-bold text-[#0e4d46]">{activeEvent.time} | {selectedDayFull} {fMonthName}</p></div>
                   <div><p className="text-[10px] font-extrabold text-[#5a827d] uppercase tracking-widest mb-2">EVENT TYPE</p>
                     <p className="text-sm font-bold text-[#0e4d46] uppercase tracking-wider">{activeEvent.event_type || 'Meeting'}</p>
                   </div>
