@@ -199,7 +199,12 @@ class UserProfileSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ['id', 'first_name', 'last_name', 'email', 'phone', 'role', 'profile_picture', 'team', 'manager']
+        fields = [
+            'id', 'first_name', 'last_name', 'email', 'phone', 'role', 
+            'profile_picture', 'team', 'manager',
+            'language', 'two_factor', 'default_view', 'email_notif', 
+            'push_notif', 'in_app_notif'
+        ]
         read_only_fields = ['id', 'email', 'role']
 
     def get_role(self, obj):
@@ -212,8 +217,13 @@ class UserProfileSerializer(serializers.ModelSerializer):
             return None
 
     def update(self, instance, validated_data):
-        # Allow updating first/last name, phone, team, manager
-        for attr in ['first_name', 'last_name', 'phone', 'team', 'manager']:
+        # Allow updating first/last name, phone, team, manager, and settings fields
+        fields_to_update = [
+            'first_name', 'last_name', 'phone', 'team', 'manager',
+            'language', 'two_factor', 'default_view', 'email_notif', 
+            'push_notif', 'in_app_notif'
+        ]
+        for attr in fields_to_update:
             if attr in validated_data:
                 setattr(instance, attr, validated_data[attr])
 

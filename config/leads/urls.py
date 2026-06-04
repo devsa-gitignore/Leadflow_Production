@@ -15,4 +15,6 @@ urlpatterns = [
     path('notifications/<int:pk>/read/', views.notification_mark_read, name='notification-mark-read'),
     # ── Profile ─────────────────────────────────────────────────────────────
     path('auth/me/', views.profile_view, name='auth-profile'),
+    path('auth/change-password/', views.change_password_view, name='auth-change-password'),
+    path('auth/delete-account/', views.delete_account_view, name='auth-delete-account'),
 ]

@@ -242,6 +242,47 @@ def profile_view(request):
     return Response({'errors': serializer.errors}, status=400)
 
 
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def change_password_view(request):
+    """POST /api/leads/auth/change-password/
+    
+    Change current user's password.
+    """
+    user = request.user
+    current_password = request.data.get('current_password')
+    new_password = request.data.get('new_password')
+
+    if not current_password or not new_password:
+        return Response({'error': 'Both current and new password are required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    if not user.check_password(current_password):
+        return Response({'error': 'Incorrect current password.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    from leads.serializers import PASSWORD_REGEX
+    if not PASSWORD_REGEX.match(new_password):
+        return Response({
+            'error': 'Password must be at least 8 characters and contain an uppercase letter, '
+                     'a lowercase letter, a digit, and a special character (@$!%*?&_-#).'
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+    user.set_password(new_password)
+    user.save()
+    return Response({'message': 'Password changed successfully.'}, status=status.HTTP_200_OK)
+
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def delete_account_view(request):
+    """DELETE /api/leads/auth/delete-account/
+    
+    Delete the current user account.
+    """
+    user = request.user
+    user.delete()
+    return Response({'message': 'Account deleted successfully.'}, status=status.HTTP_200_OK)
+
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def team_overview_data(request):

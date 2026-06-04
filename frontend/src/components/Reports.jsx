@@ -347,14 +347,14 @@ const Reports = () => {
       return apiData.revenue_trend.map((item, idx) => ({
         month: monthNames[item.month - 1] || `M${item.month}`,
         current: parseFloat(item.revenue),
-        previous: baseData.trendData[idx]?.previous || 0
+        previous: parseFloat(item.previous_revenue) || 0
       }));
     } else {
       if (!apiData?.trend_data) return baseData.trendData;
       return apiData.trend_data.map((item, idx) => ({
         month: item.month.toUpperCase(),
         current: item.amount,
-        previous: baseData.trendData[idx]?.previous || 0
+        previous: item.previous_amount || 0
       }));
     }
   };
@@ -398,20 +398,20 @@ const Reports = () => {
     trendData: calculateTrendData(),
     
     // Map Invoices to Pie Chart
-    targetData: timeRange === 'Last Year' ? baseData.targetData : [
-      { name: 'Paid', value: apiData.paid_amount, color: '#0e4d46' },
-      { name: 'Pending', value: apiData.pending_amount, color: '#f59e0b' },
-      { name: 'Overdue', value: apiData.overdue_amount, color: '#ef4444' }
+    targetData: [
+      { name: 'Paid', value: apiData.paid_amount || 0, color: '#0e4d46' },
+      { name: 'Pending', value: apiData.pending_amount || 0, color: '#f59e0b' },
+      { name: 'Overdue', value: apiData.overdue_amount || 0, color: '#ef4444' }
     ],
     // Provide safe defaults for the center text
-    achievedAmount: timeRange === 'Last Year' ? baseData.achievedAmount : apiData.paid_amount,
-    targetAmount: timeRange === 'Last Year' ? baseData.total_invoiced : apiData.total_invoiced,
+    achievedAmount: apiData.paid_amount || 0,
+    targetAmount: apiData.target || apiData.total_invoiced || 0,
     
     // Map Lead Source Performance
     leadSources: calculateLeadSources(),
 
     // Overdue invoices from backend
-    overdue: timeRange === 'Last Year' ? baseData.overdue : (apiData.overdue_invoices || []),
+    overdue: apiData.overdue_invoices || [],
 
     // Conversion by executive from backend
     executives: getExecutivesData(),

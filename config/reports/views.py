@@ -36,17 +36,28 @@ def reports_dashboard(request):
     converted = deals.filter(is_won=True).count()
     conversion_rate = (converted / active_leads * 100) if active_leads > 0 else 0
 
-    # 🔹 Monthly revenue
+    # 🔹 Monthly revenue (Current Year vs Previous Year)
+    from django.utils.timezone import now
+    current_year = now().year
+    
     monthly_data = []
     for month in range(1, 13):
         month_revenue = deals.filter(
             is_won=True,
+            created_at__year=current_year,
+            created_at__month=month
+        ).aggregate(total=Sum("deal_value"))["total"] or 0
+
+        prev_month_revenue = deals.filter(
+            is_won=True,
+            created_at__year=current_year - 1,
             created_at__month=month
         ).aggregate(total=Sum("deal_value"))["total"] or 0
 
         monthly_data.append({
             "month": month,
-            "revenue": month_revenue
+            "revenue": month_revenue,
+            "previous_revenue": prev_month_revenue
         })
 
     # 🔹 Lead source performance
@@ -70,6 +81,8 @@ def reports_dashboard(request):
     users = leads.values("assigned_to").distinct()
 
     for u in users:
+        if not u["assigned_to"]:
+            continue
         user_leads = leads.filter(assigned_to=u["assigned_to"])
         user_deals = deals.filter(
             lead__assigned_to=u["assigned_to"],
@@ -82,12 +95,70 @@ def reports_dashboard(request):
         rate = (conversions / total * 100) if total > 0 else 0
 
         first_lead = user_leads.first()
+        if first_lead and first_lead.assigned_to:
+            executives.append({
+                "name": first_lead.assigned_to.first_name,
+                "total_leads": total,
+                "conversions": conversions,
+                "conversion_rate": round(rate, 2)
+            })
 
-        executives.append({
-            "name": first_lead.assigned_to.first_name if first_lead else "Unknown",
-            "total_leads": total,
-            "conversions": conversions,
-            "conversion_rate": round(rate, 2)
+    # 🔹 Invoice & Target metrics for Dashboard alignment
+    from leads.models import Invoice
+    invoices = Invoice.objects.all()
+    if user.role and user.role.name == "Sales Rep":
+        invoices = invoices.filter(deal__lead__assigned_to=user)
+    elif user.role and user.role.name == "Sales Manager" and user.team:
+        invoices = invoices.filter(deal__lead__assigned_to__team=user.team)
+
+    total_invoiced = invoices.aggregate(total=Sum('amount'))['total'] or 0
+    paid_amount = invoices.filter(status='PAID').aggregate(total=Sum('amount'))['total'] or 0
+    pending_amount = invoices.filter(status='PENDING').aggregate(total=Sum('amount'))['total'] or 0
+    overdue_amount = invoices.filter(status='OVERDUE').aggregate(total=Sum('amount'))['total'] or 0
+
+    # Target calculation
+    today = datetime.date.today()
+    current_month_start = today.replace(day=1)
+    if today.month == 1:
+        last_month_start = today.replace(year=today.year - 1, month=12, day=1)
+    else:
+        last_month_start = today.replace(month=today.month - 1, day=1)
+
+    from leads.models import User as _UserModel
+    manager_qs = _UserModel.objects.filter(role__name__icontains="manager")
+    target_obj = Target.objects.filter(
+        user__in=manager_qs,
+        month=current_month_start,
+    ).order_by('-target_amount').first()
+
+    if target_obj is None:
+        target_obj = Target.objects.filter(
+            user__in=manager_qs,
+            month=last_month_start,
+        ).order_by('-target_amount').first()
+
+    target_value = target_obj.target_amount if target_obj else (total_revenue if total_revenue > 0 else 0)
+
+    # Overdue invoices
+    overdue_qs = Invoice.objects.filter(status='OVERDUE')
+    if user.role and user.role.name == "Sales Rep":
+        overdue_qs = overdue_qs.filter(deal__lead__assigned_to=user)
+    elif user.role and user.role.name == "Sales Manager" and user.team:
+        overdue_qs = overdue_qs.filter(deal__lead__assigned_to__team=user.team)
+
+    overdue_qs = overdue_qs.select_related('deal__lead').order_by('due_date')[:4]
+    overdue_invoices = []
+    for inv in overdue_qs:
+        overdue_days = (today - inv.due_date).days
+        company = inv.deal.lead.company if inv.deal.lead.company else (
+            f"{inv.deal.lead.first_name} {inv.deal.lead.last_name}".strip()
+        )
+        overdue_invoices.append({
+            "invoice_id": inv.id,
+            "company": company,
+            "amount": f"${inv.amount:,.2f}",
+            "days": overdue_days,
+            "isCritical": overdue_days >= 30,
         })
 
     return Response({
@@ -98,7 +169,13 @@ def reports_dashboard(request):
         },
         "revenue_trend": monthly_data,
         "lead_sources": lead_sources,
-        "executive_performance": ExecutivePerformanceSerializer(executives, many=True).data
+        "executive_performance": ExecutivePerformanceSerializer(executives, many=True).data,
+        "total_invoiced": total_invoiced,
+        "paid_amount": paid_amount,
+        "pending_amount": pending_amount,
+        "overdue_amount": overdue_amount,
+        "target": target_value,
+        "overdue_invoices": overdue_invoices,
     })
 
 from leads.models import Invoice
@@ -108,17 +185,17 @@ from leads.models import Invoice
 def reports_summary(request):
     user = request.user
     
-    # Base querysets
-    invoices = Invoice.objects.all()
-    deals = Deal.objects.all()
+    # Base querysets (unfiltered by date)
+    all_invoices = Invoice.objects.all()
+    all_deals = Deal.objects.all()
     
     if hasattr(user, 'role') and user.role:
         if user.role.name == "Sales Rep":
-            invoices = invoices.filter(deal__lead__assigned_to=user)
-            deals = deals.filter(lead__assigned_to=user)
+            all_invoices = all_invoices.filter(deal__lead__assigned_to=user)
+            all_deals = all_deals.filter(lead__assigned_to=user)
         elif user.role.name == "Sales Manager" and user.team:
-            invoices = invoices.filter(deal__lead__assigned_to__team=user.team)
-            deals = deals.filter(lead__assigned_to__team=user.team)
+            all_invoices = all_invoices.filter(deal__lead__assigned_to__team=user.team)
+            all_deals = all_deals.filter(lead__assigned_to__team=user.team)
             
     from datetime import timedelta
     from django.utils.timezone import now
@@ -136,8 +213,8 @@ def reports_summary(request):
     else:
         start_date = now() - timedelta(days=30)
 
-    invoices = invoices.filter(created_at__gte=start_date)
-    deals = deals.filter(created_at__gte=start_date)
+    invoices = all_invoices.filter(created_at__gte=start_date)
+    deals = all_deals.filter(created_at__gte=start_date)
             
     # Aggregations
     total_revenue = invoices.filter(status='PAID').aggregate(total=Sum('amount'))['total'] or 0
@@ -160,32 +237,50 @@ def reports_summary(request):
         days = 30 if range_param == "last_30_days" else (7 if range_param == "last_week" else 1)
         for i in range(days, -1, -1):
             target_date = now() - timedelta(days=i)
-            amount = invoices.filter(
+            # Current period amount
+            amount = all_invoices.filter(
                 status='PAID',
                 created_at__date=target_date.date()
             ).aggregate(total=Sum('amount'))['total'] or 0
             
+            # Previous period amount (offset by exactly days + 1)
+            prev_target_date = target_date - timedelta(days=days + 1)
+            prev_amount = all_invoices.filter(
+                status='PAID',
+                created_at__date=prev_target_date.date()
+            ).aggregate(total=Sum('amount'))['total'] or 0
+            
             trend_data.append({
                 "month": target_date.strftime("%b %d"),
-                "amount": amount
+                "amount": amount,
+                "previous_amount": prev_amount
             })
     else:
         # Group by month (last_year)
-        current_month = datetime.datetime.now().month
+        current_month = now().month
+        current_year = now().year
         month_names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
         
         for m in range(1, 13):
             if m <= current_month:
-                amount = invoices.filter(
+                amount = all_invoices.filter(
                     status='PAID',
+                    created_at__year=current_year,
                     created_at__month=m
                 ).aggregate(total=Sum('amount'))['total'] or 0
             else:
                 amount = 0
                 
+            prev_amount = all_invoices.filter(
+                status='PAID',
+                created_at__year=current_year - 1,
+                created_at__month=m
+            ).aggregate(total=Sum('amount'))['total'] or 0
+            
             trend_data.append({
                 "month": month_names[m - 1],
-                "amount": amount
+                "amount": amount,
+                "previous_amount": prev_amount
             })
 
     lead_source_performance = {
@@ -197,7 +292,7 @@ def reports_summary(request):
 
     # --- Overdue Invoices ---
     today_date = datetime.date.today()
-    overdue_qs = Invoice.objects.filter(status='OVERDUE')
+    overdue_qs = all_invoices.filter(status='OVERDUE')
     if hasattr(user, 'role') and user.role:
         if user.role.name == "Sales Rep":
             overdue_qs = overdue_qs.filter(deal__lead__assigned_to=user)

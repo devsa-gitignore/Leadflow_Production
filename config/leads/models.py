@@ -71,6 +71,12 @@ class User(AbstractUser):
 
     profile_picture = models.ImageField(upload_to='profiles/', blank=True, null=True)
 
+    language = models.CharField(max_length=50, default='English (United States)')
+    two_factor = models.BooleanField(default=True)
+    default_view = models.CharField(max_length=20, default='list')
+    email_notif = models.BooleanField(default=True)
+    push_notif = models.BooleanField(default=False)
+    in_app_notif = models.BooleanField(default=True)
     
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = []
