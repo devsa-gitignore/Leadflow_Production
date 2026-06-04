@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getCurrentUser } from '../utils/auth';
-import { fetchPipelineData, deleteDeal, createDeal } from '../services/pipelineService';
+import { fetchPipelineData, deleteDeal, createDeal, searchDeals } from '../services/pipelineService';
 
 const MyPipeline = () => {
   const [searchParams] = useSearchParams();
@@ -31,7 +31,6 @@ const MyPipeline = () => {
   const loadData = async () => {
     try {
       setLoading(true);
-      const data = await fetchPipelineData();
       
       const newLists = {
         newLead: [],
@@ -40,56 +39,76 @@ const MyPipeline = () => {
         closedLost: []
       };
 
-      const filterDeals = (deals) => {
-        if (!searchQuery) return deals;
-        return deals.filter(d => 
-          d.company?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          d.title?.toLowerCase().includes(searchQuery.toLowerCase())
-        );
-      };
+      if (searchQuery) {
+        const deals = await searchDeals(searchQuery);
+        
+        deals.forEach(deal => {
+          const mappedDeal = {
+            id: deal.id,
+            title: deal.title,
+            company: deal.company || deal.title,
+            value: `$${parseFloat(deal.deal_value).toLocaleString()}`,
+            tag: deal.result ? deal.result : (deal.priority || 'medium').toUpperCase() + ' PRIORITY',
+            result: deal.result,
+            assignedTo: deal.assigned_to_name || null,
+          };
 
-      data.pipeline.forEach(stage => {
-        const deals = stage.deals.map(deal => ({
+          if (deal.is_won || deal.is_lost || deal.result === 'WON' || deal.result === 'LOST' || deal.stage === 4) {
+            newLists.closedLost.push(mappedDeal);
+          } else if (deal.stage === 1) {
+            newLists.newLead.push(mappedDeal);
+          } else if (deal.stage === 2) {
+            newLists.contacted.push(mappedDeal);
+          } else if (deal.stage === 3) {
+            newLists.negotiation.push(mappedDeal);
+          } else {
+            newLists.newLead.push(mappedDeal);
+          }
+        });
+      } else {
+        const data = await fetchPipelineData();
+
+        data.pipeline.forEach(stage => {
+          const stageMapped = stage.deals.map(deal => ({
+            id: deal.id,
+            title: deal.title,
+            company: deal.company || deal.title,
+            value: `$${parseFloat(deal.deal_value).toLocaleString()}`,
+            tag: deal.result ? deal.result : (deal.priority || 'medium').toUpperCase() + ' PRIORITY',
+            result: deal.result,
+            assignedTo: deal.assigned_to_name || null,
+          }));
+
+          if (stage.stage_name === 'Discovery') newLists.newLead = stageMapped;
+          else if (stage.stage_name === 'Proposal') newLists.contacted = stageMapped;
+          else if (stage.stage_name === 'Negotiation') newLists.negotiation = stageMapped;
+          else if (stage.stage_name === 'Closed') newLists.closedLost = [...newLists.closedLost, ...stageMapped];
+          else {
+            if (newLists.newLead.length === 0) newLists.newLead = stageMapped;
+          }
+        });
+
+        const closed = data.closed_deals.map(deal => ({
           id: deal.id,
           title: deal.title,
           company: deal.company || deal.title,
           value: `$${parseFloat(deal.deal_value).toLocaleString()}`,
-          tag: deal.result ? deal.result : (deal.priority || 'medium').toUpperCase() + ' PRIORITY',
-          result: deal.result,
+          tag: 'WON',
+          result: 'WON',
+          assignedTo: deal.assigned_to_name || null,
+        }));
+        const lost = data.lost_deals.map(deal => ({
+          id: deal.id,
+          title: deal.title,
+          company: deal.company || deal.title,
+          value: `$${parseFloat(deal.deal_value).toLocaleString()}`,
+          tag: 'LOST',
+          result: 'LOST',
           assignedTo: deal.assigned_to_name || null,
         }));
 
-        const filtered = filterDeals(deals);
-
-        if (stage.stage_name === 'Discovery') newLists.newLead = filtered;
-        else if (stage.stage_name === 'Proposal') newLists.contacted = filtered;
-        else if (stage.stage_name === 'Negotiation') newLists.negotiation = filtered;
-        else if (stage.stage_name === 'Closed') newLists.closedLost = [...newLists.closedLost, ...filtered];
-        else {
-          if (newLists.newLead.length === 0) newLists.newLead = filtered;
-        }
-      });
-
-      const closed = data.closed_deals.map(deal => ({
-        id: deal.id,
-        title: deal.title,
-        company: deal.company || deal.title,
-        value: `$${parseFloat(deal.deal_value).toLocaleString()}`,
-        tag: 'WON',
-        result: 'WON',
-        assignedTo: deal.assigned_to_name || null,
-      }));
-      const lost = data.lost_deals.map(deal => ({
-        id: deal.id,
-        title: deal.title,
-        company: deal.company || deal.title,
-        value: `$${parseFloat(deal.deal_value).toLocaleString()}`,
-        tag: 'LOST',
-        result: 'LOST',
-        assignedTo: deal.assigned_to_name || null,
-      }));
-
-      newLists.closedLost = [...newLists.closedLost, ...filterDeals(closed), ...filterDeals(lost)];
+        newLists.closedLost = [...newLists.closedLost, ...closed, ...lost];
+      }
 
       setLists(newLists);
       setError(null);

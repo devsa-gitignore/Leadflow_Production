@@ -16,8 +16,7 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
-from rest_framework_simplejwt.views import TokenRefreshView
-
+from leads.auth_views import cookie_token_refresh
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -26,6 +25,6 @@ urlpatterns = [
     path('api/invoices/', include('invoices.urls')),
     path('api/scheduling/', include('scheduling.urls')),
     path('api/tasks/', include('tasks.urls')),
-    path('api/token/refresh/', TokenRefreshView.as_view()),
+    path('api/token/refresh/', cookie_token_refresh, name='token-refresh'),
     path('api/pipeline/', include('pipeline.urls')),
 ]

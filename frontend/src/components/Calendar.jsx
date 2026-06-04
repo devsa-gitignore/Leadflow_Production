@@ -557,7 +557,7 @@ const CreateEventView = ({ onSave, onCancel, onDelete, initialData, dealOptions 
     if (matchedDeal?.leadId && String(matchedDeal.leadId) !== selectedLeadId) {
       setSelectedLeadId(String(matchedDeal.leadId));
     }
-  }, [dealOptions, selectedDealId, selectedLeadId]);
+  }, [dealOptions, selectedDealId]);
 
   const addAttendee = (user) => {
     setSelectedAttendees(prev => [...prev, user]);

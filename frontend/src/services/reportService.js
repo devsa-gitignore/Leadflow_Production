@@ -10,6 +10,16 @@ export const fetchReportsSummary = async (range) => {
     }
 };
 
+export const fetchReportsDashboard = async () => {
+    try {
+        const response = await api.get('/api/reports/dashboard/');
+        return response.data;
+    } catch (error) {
+        console.error('Error fetching reports dashboard:', error);
+        throw error;
+    }
+};
+
 export const setMonthlyTarget = async (targetAmount) => {
     try {
         const response = await api.post('/api/reports/set-target/', { target_amount: targetAmount });

@@ -186,7 +186,8 @@ const hardcodedData = {
   }
 };
 
-import { fetchReportsSummary } from '../services/reportService';
+import { fetchReportsSummary, fetchReportsDashboard } from '../services/reportService';
+import { fetchMonthlyFinancialReport, downloadMonthlyFinancialReportPDF } from '../services/invoiceService';
 
 const Reports = () => {
   const [user, setUser] = useState(null);
@@ -197,6 +198,77 @@ const Reports = () => {
   // Real backend data state
   const [apiData, setApiData] = useState(null);
   const [loading, setLoading] = useState(true);
+
+  // Financial Reports States
+  const [activeTab, setActiveTab] = useState('overview'); // 'overview' or 'financial'
+  const [reportMonth, setReportMonth] = useState(new Date().getMonth() + 1); // 1-12
+  const [reportYear, setReportYear] = useState(new Date().getFullYear());
+  const [financialReport, setFinancialReport] = useState(null);
+  const [financialLoading, setFinancialLoading] = useState(false);
+  const [downloadingPDF, setDownloadingPDF] = useState(false);
+  const [financialError, setFinancialError] = useState(null);
+
+  // Month Names Helper
+  const monthsList = [
+    { value: 1, label: 'January' },
+    { value: 2, label: 'February' },
+    { value: 3, label: 'March' },
+    { value: 4, label: 'April' },
+    { value: 5, label: 'May' },
+    { value: 6, label: 'June' },
+    { value: 7, label: 'July' },
+    { value: 8, label: 'August' },
+    { value: 9, label: 'September' },
+    { value: 10, label: 'October' },
+    { value: 11, label: 'November' },
+    { value: 12, label: 'December' }
+  ];
+
+  // Years list helper (from 2024 to next year)
+  const currentYear = new Date().getFullYear();
+  const yearsList = Array.from({ length: 4 }, (_, idx) => 2024 + idx);
+
+  // Load Financial Report
+  useEffect(() => {
+    if (activeTab === 'financial') {
+      const loadFinancialReport = async () => {
+        try {
+          setFinancialLoading(true);
+          setFinancialError(null);
+          const data = await fetchMonthlyFinancialReport(reportMonth, reportYear);
+          setFinancialReport(data);
+        } catch (error) {
+          console.error("Failed to load financial report:", error);
+          setFinancialError("Could not retrieve financial data from the server.");
+        } finally {
+          setFinancialLoading(false);
+        }
+      };
+      loadFinancialReport();
+    }
+  }, [activeTab, reportMonth, reportYear]);
+
+  // Handle PDF Export download
+  const handleDownloadPDF = async () => {
+    try {
+      setDownloadingPDF(true);
+      const blob = await downloadMonthlyFinancialReportPDF(reportMonth, reportYear);
+      // Create blob link and trigger download
+      const url = window.URL.createObjectURL(new Blob([blob], { type: 'application/pdf' }));
+      const link = document.createElement('a');
+      link.href = url;
+      const monthStr = String(reportMonth).padStart(2, '0');
+      link.setAttribute('download', `LeadFlow_Financial_Report_${reportYear}_${monthStr}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode.removeChild(link);
+    } catch (error) {
+      console.error("PDF download failed:", error);
+      alert("Failed to download PDF report. Please verify server status.");
+    } finally {
+      setDownloadingPDF(false);
+    }
+  };
 
   const mapRangeToQuery = (rangeStr) => {
     if (rangeStr === 'Last 30 Days') return 'last_30_days';
@@ -210,8 +282,13 @@ const Reports = () => {
     const loadData = async () => {
       try {
         setLoading(true);
-        const queryRange = mapRangeToQuery(timeRange);
-        const backendData = await fetchReportsSummary(queryRange);
+        let backendData;
+        if (timeRange === 'Last Year') {
+          backendData = await fetchReportsDashboard();
+        } else {
+          const queryRange = mapRangeToQuery(timeRange);
+          backendData = await fetchReportsSummary(queryRange);
+        }
         setApiData(backendData);
       } catch (error) {
         console.error("Failed to load reports data", error);
@@ -242,59 +319,102 @@ const Reports = () => {
   const baseData = hardcodedData[timeRange];
   
   const calculateLeadSources = () => {
-    if (!apiData?.lead_source_performance) return baseData.leadSources;
-    
-    const p = apiData.lead_source_performance;
-    const total = p.DIRECT + p.PAID + p.REFERRAL + p.SOCIAL;
-    
-    if (total === 0) return baseData.leadSources;
-    
-    return [
-      { label: 'Direct Search', value: Math.round((p.DIRECT / total) * 100), active: p.DIRECT > 0 },
-      { label: 'Paid Campaigns', value: Math.round((p.PAID / total) * 100), active: p.PAID > 0 },
-      { label: 'Referrals', value: Math.round((p.REFERRAL / total) * 100), active: p.REFERRAL > 0 },
-      { label: 'Social Media', value: Math.round((p.SOCIAL / total) * 100), active: p.SOCIAL > 0 },
-    ].sort((a, b) => b.value - a.value);
+    if (timeRange === 'Last Year') {
+      if (!apiData?.lead_sources) return baseData.leadSources;
+      return apiData.lead_sources.map(item => ({
+        label: item.source || 'Unknown',
+        value: Math.round(item.percentage) || 0,
+        active: item.percentage > 0
+      })).sort((a, b) => b.value - a.value);
+    } else {
+      if (!apiData?.lead_source_performance) return baseData.leadSources;
+      const p = apiData.lead_source_performance;
+      const total = p.DIRECT + p.PAID + p.REFERRAL + p.SOCIAL;
+      if (total === 0) return baseData.leadSources;
+      return [
+        { label: 'Direct Search', value: Math.round((p.DIRECT / total) * 100), active: p.DIRECT > 0 },
+        { label: 'Paid Campaigns', value: Math.round((p.PAID / total) * 100), active: p.PAID > 0 },
+        { label: 'Referrals', value: Math.round((p.REFERRAL / total) * 100), active: p.REFERRAL > 0 },
+        { label: 'Social Media', value: Math.round((p.SOCIAL / total) * 100), active: p.SOCIAL > 0 },
+      ].sort((a, b) => b.value - a.value);
+    }
   };
   
   const calculateTrendData = () => {
-    if (!apiData?.trend_data) return baseData.trendData;
-    
-    return apiData.trend_data.map((item, idx) => ({
-      month: item.month.toUpperCase(),
-      current: item.amount,
-      previous: baseData.trendData[idx]?.previous || 0
-    }));
+    if (timeRange === 'Last Year') {
+      if (!apiData?.revenue_trend) return baseData.trendData;
+      const monthNames = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
+      return apiData.revenue_trend.map((item, idx) => ({
+        month: monthNames[item.month - 1] || `M${item.month}`,
+        current: parseFloat(item.revenue),
+        previous: baseData.trendData[idx]?.previous || 0
+      }));
+    } else {
+      if (!apiData?.trend_data) return baseData.trendData;
+      return apiData.trend_data.map((item, idx) => ({
+        month: item.month.toUpperCase(),
+        current: item.amount,
+        previous: baseData.trendData[idx]?.previous || 0
+      }));
+    }
+  };
+
+  const getExecutivesData = () => {
+    if (timeRange === 'Last Year') {
+      if (!apiData?.executive_performance) return baseData.executives;
+      return apiData.executive_performance.map(exec => {
+        const rate = exec.conversion_rate;
+        let perf = 'IMPROVING';
+        let perfColor = 'bg-yellow-100/70 text-yellow-600';
+        if (rate >= 25) {
+          perf = 'EXCELLENT';
+          perfColor = 'bg-emerald-100/70 text-emerald-600';
+        } else if (rate >= 15) {
+          perf = 'ON TRACK';
+          perfColor = 'bg-slate-100 text-slate-500';
+        }
+        return {
+          name: exec.name,
+          leads: exec.total_leads,
+          conversions: exec.conversions,
+          rate: `${rate}%`,
+          perf,
+          perfColor
+        };
+      });
+    } else {
+      return apiData.conversion_by_executive || [];
+    }
   };
   
   // Merge API data with base UI data
   const data = apiData ? {
     ...baseData,
-    totalRevenue: apiData.total_revenue,
-    activeLeads: apiData.deals_closed, // Mapping deals closed to the 'Active Leads' card
-    conversionRate: apiData.conversion_rate,
+    totalRevenue: timeRange === 'Last Year' ? (apiData.summary?.total_revenue || 0) : apiData.total_revenue,
+    activeLeads: timeRange === 'Last Year' ? (apiData.summary?.active_leads || 0) : apiData.deals_closed,
+    conversionRate: timeRange === 'Last Year' ? (apiData.summary?.conversion_rate || 0) : apiData.conversion_rate,
     
     // Map Revenue Trend
     trendData: calculateTrendData(),
     
     // Map Invoices to Pie Chart
-    targetData: [
+    targetData: timeRange === 'Last Year' ? baseData.targetData : [
       { name: 'Paid', value: apiData.paid_amount, color: '#0e4d46' },
       { name: 'Pending', value: apiData.pending_amount, color: '#f59e0b' },
       { name: 'Overdue', value: apiData.overdue_amount, color: '#ef4444' }
     ],
     // Provide safe defaults for the center text
-    achievedAmount: apiData.paid_amount,
-    targetAmount: apiData.total_invoiced,
+    achievedAmount: timeRange === 'Last Year' ? baseData.achievedAmount : apiData.paid_amount,
+    targetAmount: timeRange === 'Last Year' ? baseData.total_invoiced : apiData.total_invoiced,
     
     // Map Lead Source Performance
     leadSources: calculateLeadSources(),
 
     // Overdue invoices from backend
-    overdue: apiData.overdue_invoices || [],
+    overdue: timeRange === 'Last Year' ? baseData.overdue : (apiData.overdue_invoices || []),
 
     // Conversion by executive from backend
-    executives: apiData.conversion_by_executive || [],
+    executives: getExecutivesData(),
   } : baseData;
 
 
@@ -315,8 +435,34 @@ const Reports = () => {
 
   return (
     <div className="relative z-10 w-full">
-        
-        {/* Top Global Controls */}
+      
+      {/* Premium Tab Selection Header */}
+      <div className="flex border-b border-teal-500/10 mb-8 gap-6">
+        <button
+          onClick={() => setActiveTab('overview')}
+          className={`pb-4 text-xs md:text-sm font-extrabold transition-all border-b-2 uppercase tracking-widest ${
+            activeTab === 'overview'
+              ? 'border-[#0e4d46] text-[#0e4d46]'
+              : 'border-transparent text-[#5a827d] hover:text-[#0e4d46]'
+          }`}
+        >
+          Performance Dashboard
+        </button>
+        <button
+          onClick={() => setActiveTab('financial')}
+          className={`pb-4 text-xs md:text-sm font-extrabold transition-all border-b-2 uppercase tracking-widest ${
+            activeTab === 'financial'
+              ? 'border-[#0e4d46] text-[#0e4d46]'
+              : 'border-transparent text-[#5a827d] hover:text-[#0e4d46]'
+          }`}
+        >
+          Financial Statement Reports
+        </button>
+      </div>
+
+      {activeTab === 'overview' ? (
+        <>
+          {/* Top Global Controls */}
         <div className="flex flex-col sm:flex-row justify-end items-stretch sm:items-center gap-4 mb-8">
           <div className="relative" ref={dropdownRef}>
             <button 
@@ -447,16 +593,14 @@ const Reports = () => {
             <h3 className="font-extrabold text-[#0e4d46] text-base mb-4">Target vs Achievement</h3>
             <div className="flex flex-col items-center justify-center flex-1">
               {(() => {
-                const currentRevenue = apiData ? Number(apiData.current_revenue) : 0;
-                const target = apiData ? Number(apiData.target) : 0;
-                const percentage = target > 0 ? (currentRevenue / target) * 100 : 0;
+                const achievedAmount = (timeRange === 'Last Year' || !apiData) ? data.achievedAmount : Number(apiData.current_revenue);
+                const targetAmount = (timeRange === 'Last Year' || !apiData) ? data.targetAmount : Number(apiData.target);
+                const percentage = targetAmount > 0 ? (achievedAmount / targetAmount) * 100 : 0;
                 const percentageLabel = percentage === 0
                   ? '0%'
                   : percentage >= 1
                     ? `${Math.round(percentage)}%`
                     : `${percentage.toFixed(2)}%`;
-                const achievedAmount = apiData ? Number(apiData.current_revenue) : data.achievedAmount;
-                const targetAmount = apiData ? Number(apiData.target) : data.targetAmount;
 
                 const donutData = [
                   { name: 'Achieved', value: Math.min(percentage, 100), color: '#0e4d46' },
@@ -591,14 +735,228 @@ const Reports = () => {
               </div>
             ))}
             {data.overdue.length === 0 && (
-              <div className="col-span-full py-8 text-center text-sm font-bold text-slate-400">
+          <div className="col-span-full py-8 text-center text-sm font-bold text-slate-400">
                 No overdue invoices found for this period.
               </div>
             )}
           </div>
         </div>
+      </>
+      ) : (
+        <div className="space-y-8 animate-in fade-in duration-300">
+          
+          {/* Controls & Period Selector card */}
+          <div className="bg-white p-6 md:p-8 rounded-[2rem] shadow-[0_2px_10px_rgb(0,0,0,0.02)] border border-gray-100/50 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+            <div>
+              <h2 className="text-xl font-extrabold text-[#0e4d46] mb-1">Financial Report Generator</h2>
+              <p className="text-xs text-[#5a827d] font-bold">Select a reporting period to preview and export monthly invoices and payments.</p>
+            </div>
+            
+            <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+              {/* Month Selector */}
+              <div className="flex-1 sm:flex-none">
+                <select 
+                  value={reportMonth} 
+                  onChange={(e) => setReportMonth(Number(e.target.value))}
+                  className="w-full sm:w-40 bg-[#f0f7f6] border border-teal-50/50 rounded-xl px-4 py-2.5 text-xs font-extrabold text-[#0e4d46] focus:outline-none focus:ring-2 focus:ring-teal-500/20"
+                >
+                  {monthsList.map(m => (
+                    <option key={m.value} value={m.value}>{m.label}</option>
+                  ))}
+                </select>
+              </div>
 
-      </div>
+              {/* Year Selector */}
+              <div className="flex-1 sm:flex-none">
+                <select 
+                  value={reportYear} 
+                  onChange={(e) => setReportYear(Number(e.target.value))}
+                  className="w-full sm:w-28 bg-[#f0f7f6] border border-teal-50/50 rounded-xl px-4 py-2.5 text-xs font-extrabold text-[#0e4d46] focus:outline-none focus:ring-2 focus:ring-teal-500/20"
+                >
+                  {yearsList.map(y => (
+                    <option key={y} value={y}>{y}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Export PDF Button */}
+              <button 
+                onClick={handleDownloadPDF}
+                disabled={financialLoading || downloadingPDF || !financialReport}
+                className={`w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-2.5 text-xs font-extrabold text-white bg-[#0e4d46] hover:bg-[#0a3d37] transition-all rounded-xl shadow-md ${
+                  (financialLoading || downloadingPDF || !financialReport) ? 'opacity-50 cursor-not-allowed' : ''
+                }`}
+              >
+                {downloadingPDF ? (
+                  <>
+                    <svg className="animate-spin h-4 w-4 text-white mr-1.5 inline-block" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    </svg>
+                    <span>Generating...</span>
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4 mr-1.5 inline-block" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                    <span>Export PDF</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+
+          {/* Loader or Error or Results */}
+          {financialLoading ? (
+            <div className="bg-white rounded-[2rem] p-12 border border-gray-50 flex flex-col items-center justify-center min-h-[300px]">
+              <svg className="animate-spin h-10 w-10 text-[#0e4d46] mb-4" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+              </svg>
+              <span className="text-xs font-extrabold text-[#5a827d] uppercase tracking-widest">Fetching Report Details...</span>
+            </div>
+          ) : financialError ? (
+            <div className="bg-white rounded-[2rem] p-12 border border-red-100 flex flex-col items-center justify-center min-h-[300px]">
+              <div className="w-12 h-12 bg-red-50 text-red-500 rounded-full flex items-center justify-center mb-4">
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              <h3 className="text-sm font-extrabold text-[#0e4d46] mb-1">Server Error</h3>
+              <p className="text-xs text-red-500 font-bold mb-4">{financialError}</p>
+              <button 
+                onClick={() => setReportMonth(reportMonth)} 
+                className="px-4 py-2 text-xs font-extrabold text-[#0e4d46] bg-[#f0f7f6] hover:bg-[#d1e5e2] rounded-xl transition-all"
+              >
+                Retry Request
+              </button>
+            </div>
+          ) : financialReport ? (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              
+              {/* Card 1: Invoices Summary */}
+              <div className="bg-white p-6 md:p-8 rounded-[2rem] shadow-[0_2px_10px_rgb(0,0,0,0.02)] border border-gray-100/50 flex flex-col hover:-translate-y-1 hover:shadow-md transition-all duration-300">
+                <div className="text-[10px] text-[#5a827d] font-extrabold uppercase tracking-widest mb-3">Invoice Overview</div>
+                <h3 className="text-2xl md:text-3xl font-extrabold text-[#0e4d46] mb-6 flex items-baseline gap-1">
+                  <AnimatedNumber value={financialReport.invoices.total_value} prefix="$" isCurrency duration={1000} />
+                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Total Value</span>
+                </h3>
+                
+                <div className="space-y-4 flex-1">
+                  <div className="flex justify-between items-center py-2 border-b border-gray-50">
+                    <span className="text-xs font-bold text-slate-400">Total Generated</span>
+                    <span className="text-xs font-extrabold text-[#0e4d46]">{financialReport.invoices.total_count} invoices</span>
+                  </div>
+                  <div className="flex justify-between items-center py-2 border-b border-gray-50">
+                    <span className="text-xs font-bold text-slate-400">Paid Invoices</span>
+                    <span className="text-xs font-extrabold text-emerald-600">{financialReport.invoices.paid_count} paid</span>
+                  </div>
+                  <div className="flex justify-between items-center py-2 border-b border-gray-50">
+                    <span className="text-xs font-bold text-slate-400">Overdue Invoices</span>
+                    <span className="text-xs font-extrabold text-red-500">{financialReport.invoices.overdue_count} overdue</span>
+                  </div>
+                  <div className="flex justify-between items-center py-2">
+                    <span className="text-xs font-bold text-slate-400">Pending Invoices</span>
+                    <span className="text-xs font-extrabold text-amber-500">{financialReport.invoices.pending_count} pending</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Card 2: Payments Summary */}
+              <div className="bg-white p-6 md:p-8 rounded-[2rem] shadow-[0_2px_10px_rgb(0,0,0,0.02)] border border-gray-100/50 flex flex-col hover:-translate-y-1 hover:shadow-md transition-all duration-300">
+                <div className="text-[10px] text-[#5a827d] font-extrabold uppercase tracking-widest mb-3">Collected Collections</div>
+                <h3 className="text-2xl md:text-3xl font-extrabold text-emerald-600 mb-6 flex items-baseline gap-1">
+                  <AnimatedNumber value={financialReport.payments.total_collected} prefix="$" isCurrency duration={1000} />
+                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Total Received</span>
+                </h3>
+                
+                <div className="space-y-4 flex-1">
+                  <div className="flex justify-between items-center py-2 border-b border-gray-50">
+                    <span className="text-xs font-bold text-slate-400">Processed Transactions</span>
+                    <span className="text-xs font-extrabold text-[#0e4d46]">{financialReport.payments.transaction_count} deposits</span>
+                  </div>
+                  <div className="flex justify-between items-center py-2 border-b border-gray-50">
+                    <span className="text-xs font-bold text-slate-400">Average Transaction</span>
+                    <span className="text-xs font-extrabold text-[#0e4d46]">
+                      ${(financialReport.payments.transaction_count > 0 
+                        ? (financialReport.payments.total_collected / financialReport.payments.transaction_count) 
+                        : 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center py-2">
+                    <span className="text-xs font-bold text-slate-400">Payment Period</span>
+                    <span className="text-xs font-extrabold text-slate-400">{financialReport.period}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Card 3: Collection Rate Gauge */}
+              <div className="bg-white p-6 md:p-8 rounded-[2rem] shadow-[0_2px_10px_rgb(0,0,0,0.02)] border border-gray-100/50 flex flex-col hover:-translate-y-1 hover:shadow-md transition-all duration-300 items-center justify-between">
+                <div className="text-[10px] text-[#5a827d] font-extrabold uppercase tracking-widest mb-3 w-full text-left">Collections Performance</div>
+                
+                {(() => {
+                  const totalInvoiced = financialReport.invoices.total_value;
+                  const totalCollected = financialReport.payments.total_collected;
+                  const collectionRate = totalInvoiced > 0 ? (totalCollected / totalInvoiced) * 100 : 0;
+                  const formattedRate = collectionRate >= 100 ? '100%' : `${collectionRate.toFixed(1)}%`;
+                  
+                  const radialData = [
+                    { name: 'Collected', value: Math.min(collectionRate, 100), color: '#10b981' },
+                    { name: 'Remaining', value: Math.max(100 - collectionRate, 0), color: '#f0f7f6' }
+                  ];
+
+                  return (
+                    <>
+                      <div className="relative w-36 h-36 flex items-center justify-center">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
+                            <Pie 
+                              data={radialData} 
+                              cx="50%" 
+                              cy="50%" 
+                              innerRadius="75%" 
+                              outerRadius="90%" 
+                              startAngle={90} 
+                              endAngle={-270} 
+                              dataKey="value" 
+                              stroke="none" 
+                              cornerRadius={6}
+                              animationDuration={800}
+                            >
+                              {radialData.map((entry, idx) => (
+                                <Cell key={`cell-${idx}`} fill={entry.color} />
+                              ))}
+                            </Pie>
+                          </PieChart>
+                        </ResponsiveContainer>
+                        <div className="absolute flex flex-col items-center justify-center">
+                          <span className="text-xl md:text-2xl font-extrabold text-[#0e4d46]">{formattedRate}</span>
+                          <span className="text-[8px] text-[#5a827d] font-extrabold uppercase tracking-widest mt-0.5">Rate</span>
+                        </div>
+                      </div>
+                      
+                      <div className="w-full text-center mt-4">
+                        <p className="text-xs font-bold text-[#5a827d]">
+                          Collected <span className="text-emerald-600 font-extrabold">${totalCollected.toLocaleString()}</span> out of <span className="text-[#0e4d46] font-extrabold">${totalInvoiced.toLocaleString()}</span> invoiced values.
+                        </p>
+                      </div>
+                    </>
+                  );
+                })()}
+              </div>
+
+            </div>
+          ) : (
+            <div className="bg-white rounded-[2rem] p-12 border border-gray-50 flex flex-col items-center justify-center min-h-[300px]">
+              <span className="text-xs font-extrabold text-[#5a827d] uppercase tracking-widest">No Period Selected</span>
+            </div>
+          )}
+
+        </div>
+      )}
+
+    </div>
   );
 };
 

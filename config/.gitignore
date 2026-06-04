@@ -36,5 +36,3 @@ media/
 .coverage
 htmlcov/
 .pytest_cache/
-
-credentials.txt

@@ -24,8 +24,9 @@ def get_monthly_financial_report(month=None, year=None):
         "invoices": {
             "total_count": monthly_invoices.count(),
             "total_value": float(monthly_invoices.aggregate(Sum('total_amount'))['total_amount__sum'] or 0),
-            "paid_count": monthly_invoices.filter(status='paid').count(),
-            "overdue_count": monthly_invoices.filter(status='overdue').count(),
+            "paid_count": monthly_invoices.filter(status='PAID').count(),
+            "overdue_count": monthly_invoices.filter(status='OVERDUE').count(),
+            "pending_count": monthly_invoices.filter(status='PENDING').count(),
         },
         "payments": {
             "total_collected": float(monthly_payments.aggregate(Sum('amount_paid'))['amount_paid__sum'] or 0),

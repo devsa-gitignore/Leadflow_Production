@@ -12,3 +12,8 @@ export const updateProfile = async (formData) => {
   const res = await api.patch('/api/leads/auth/me/', formData, config);
   return res.data;
 };
+
+export const fetchTeamData = async () => {
+  const res = await api.get('/api/leads/team/');
+  return res.data;
+};

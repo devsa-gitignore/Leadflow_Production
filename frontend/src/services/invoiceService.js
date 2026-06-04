@@ -27,3 +27,27 @@ export const updateInvoiceStatus = async (invoiceId, status) => {
         throw error;
     }
 };
+export const fetchMonthlyFinancialReport = async (month, year) => {
+    try {
+        const response = await api.get('/api/invoices/monthly-report/', {
+            params: { month, year }
+        });
+        return response.data;
+    } catch (error) {
+        console.error('Error fetching monthly financial report:', error);
+        throw error;
+    }
+};
+
+export const downloadMonthlyFinancialReportPDF = async (month, year) => {
+    try {
+        const response = await api.get('/api/invoices/monthly-report/', {
+            params: { month, year, export: 'pdf' },
+            responseType: 'blob'
+        });
+        return response.data;
+    } catch (error) {
+        console.error('Error downloading monthly financial report PDF:', error);
+        throw error;
+    }
+};

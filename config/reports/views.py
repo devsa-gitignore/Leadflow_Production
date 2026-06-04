@@ -1,4 +1,5 @@
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
 from django.db.models import Count, Sum, Q
@@ -7,11 +8,12 @@ import datetime
 
 from leads.models import Lead
 from pipeline.models import Deal
-from .serializers import ExecutivePerformanceSerializer
-from .models import Target
+from reports.serializers import ExecutivePerformanceSerializer
+from reports.models import Target
 
 
 @api_view(["GET"])
+@permission_classes([IsAuthenticated])
 def reports_dashboard(request):
 
     user = request.user  
@@ -102,6 +104,7 @@ def reports_dashboard(request):
 from leads.models import Invoice
 
 @api_view(["GET"])
+@permission_classes([IsAuthenticated])
 def reports_summary(request):
     user = request.user
     
@@ -329,6 +332,7 @@ def reports_summary(request):
 
 
 @api_view(["POST"])
+@permission_classes([IsAuthenticated])
 def set_target(request):
     user = request.user
 

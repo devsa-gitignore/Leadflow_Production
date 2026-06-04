@@ -16,8 +16,8 @@ from rest_framework import generics
 from django.utils import timezone
 import uuid
 from leads.models import Invoice, Deal
-from .serializers import InvoiceSerializer
-from .reports import get_monthly_financial_report
+from invoices.serializers import InvoiceSerializer
+from invoices.reports import get_monthly_financial_report
 
 
 class AutoGenerateInvoicesAPIView(APIView):
@@ -95,6 +95,7 @@ class InvoiceListAPIView(generics.ListAPIView):
 
 
 class MonthlyReportAPIView(APIView):
+    permission_classes = [IsAuthenticated]
 
     def get(self, request):
         # Query params
@@ -139,4 +140,4 @@ class MonthlyReportAPIView(APIView):
 class InvoiceDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Invoice.objects.all()
     serializer_class = InvoiceSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated]

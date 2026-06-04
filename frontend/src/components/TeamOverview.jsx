@@ -5,142 +5,65 @@ import {
 } from 'recharts';
 import DashboardLayout from './DashboardLayout';
 import { getCurrentUser } from '../utils/auth';
+import { fetchTeamData } from '../services/userService';
 
 const TeamOverview = () => {
   const [user, setUser] = useState(null);
-  const [searchTerm, setSearchTerm] = useState(''); // Added Search State
-  const [selectedMemberName, setSelectedMemberName] = useState('Arjun Raval');
-
-  // DATA STORE
-  const memberStats = {
-    'Arjun Raval': {
-      role: 'Senior Sales Exec',
-      tags: ['Top Performer', 'Mid-Market'],
-      revenue: '$184,500',
-      winRate: '24.8%',
-      calls: '1,240',
-      meetings: '42',
-      quota: 92,
-      toTarget: '$18.4k',
-      daysLeft: 8,
-      revenueData: [
-        { name: 'JAN', value: 45 }, { name: 'FEB', value: 55 }, { name: 'MAR', value: 40 },
-        { name: 'APR', value: 70 }, { name: 'MAY', value: 85 }, { name: 'JUN', value: 65 },
-      ],
-      stageData: [
-        { name: 'Proposal', value: 42, color: '#cbdad8' },
-        { name: 'Negotiation', value: 28, color: '#0e4d46' },
-        { name: 'Discovery', value: 30, color: '#5a827d' },
-      ],
-      avgDeal: '$15.4k',
-      cycle: '22 Days',
-      retention: '98%',
-      leads: '145'
-    },
-    'Ananya Jha': {
-      role: 'Account Executive',
-      tags: ['Growth Lead', 'Enterprise'],
-      revenue: '$142,000',
-      winRate: '19.5%',
-      calls: '980',
-      meetings: '31',
-      quota: 78,
-      toTarget: '$45.0k',
-      daysLeft: 8,
-      revenueData: [
-        { name: 'JAN', value: 30 }, { name: 'FEB', value: 40 }, { name: 'MAR', value: 50 },
-        { name: 'APR', value: 45 }, { name: 'MAY', value: 60 }, { name: 'JUN', value: 55 },
-      ],
-      stageData: [
-        { name: 'Proposal', value: 20, color: '#cbdad8' },
-        { name: 'Negotiation', value: 50, color: '#0e4d46' },
-        { name: 'Discovery', value: 30, color: '#5a827d' },
-      ],
-      avgDeal: '$22.1k',
-      cycle: '45 Days',
-      retention: '94%',
-      leads: '89'
-    },
-    'Priya Jadhav': {
-      role: 'Regional Lead',
-      tags: ['Elite', 'Strategic'],
-      revenue: '$310,000',
-      winRate: '32.1%',
-      calls: '650',
-      meetings: '54',
-      quota: 100,
-      toTarget: '$0 (Met)',
-      daysLeft: 8,
-      revenueData: [
-        { name: 'JAN', value: 80 }, { name: 'FEB', value: 85 }, { name: 'MAR', value: 90 },
-        { name: 'APR', value: 95 }, { name: 'MAY', value: 100 }, { name: 'JUN', value: 110 },
-      ],
-      stageData: [
-        { name: 'Proposal', value: 35, color: '#cbdad8' },
-        { name: 'Negotiation', value: 35, color: '#0e4d46' },
-        { name: 'Discovery', value: 30, color: '#5a827d' },
-      ],
-      avgDeal: '$45.0k',
-      cycle: '60 Days',
-      retention: '100%',
-      leads: '210'
-    },
-    'Rohan Shah': {
-      role: 'Sales Development',
-      tags: ['SDR', 'Outbound'],
-      revenue: '$62,400',
-      winRate: '12.4%',
-      calls: '2,800',
-      meetings: '88',
-      quota: 64,
-      toTarget: '$22.1k',
-      daysLeft: 8,
-      revenueData: [
-        { name: 'JAN', value: 15 }, { name: 'FEB', value: 20 }, { name: 'MAR', value: 25 },
-        { name: 'APR', value: 22 }, { name: 'MAY', value: 30 }, { name: 'JUN', value: 28 },
-      ],
-      stageData: [
-        { name: 'Proposal', value: 15, color: '#cbdad8' },
-        { name: 'Negotiation', value: 15, color: '#0e4d46' },
-        { name: 'Discovery', value: 70, color: '#5a827d' },
-      ],
-      avgDeal: '$4.2k',
-      cycle: '12 Days',
-      retention: '88%',
-      leads: '540'
-    },
-    'Abhishake Mehta': {
-      role: 'Associate Sales',
-      tags: ['Junior', 'SMB'],
-      revenue: '$45,000',
-      winRate: '10.2%',
-      calls: '1,500',
-      meetings: '24',
-      quota: 45,
-      toTarget: '$55.0k',
-      daysLeft: 8,
-      revenueData: [
-        { name: 'JAN', value: 10 }, { name: 'FEB', value: 12 }, { name: 'MAR', value: 8 },
-        { name: 'APR', value: 15 }, { name: 'MAY', value: 20 }, { name: 'JUN', value: 18 },
-      ],
-      stageData: [
-        { name: 'Proposal', value: 10, color: '#cbdad8' },
-        { name: 'Negotiation', value: 20, color: '#0e4d46' },
-        { name: 'Discovery', value: 70, color: '#5a827d' },
-      ],
-      avgDeal: '$8.1k',
-      cycle: '18 Days',
-      retention: '92%',
-      leads: '110'
-    }
-  };
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedMemberName, setSelectedMemberName] = useState('');
+  const [memberStats, setMemberStats] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     const currentUser = getCurrentUser();
     if (currentUser) {
       setUser(currentUser);
     }
+
+    const loadTeamData = async () => {
+      try {
+        setLoading(true);
+        const data = await fetchTeamData();
+        setMemberStats(data);
+        const keys = Object.keys(data);
+        if (keys.length > 0) {
+          setSelectedMemberName(keys[0]);
+        }
+        setError(null);
+      } catch (err) {
+        console.error('Failed to load team data:', err);
+        setError('Failed to load team metrics. Please try again.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadTeamData();
   }, []);
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[450px] gap-4 w-full bg-[#ecf5f3] rounded-3xl p-10 border border-teal-100">
+        <div className="w-12 h-12 border-4 border-teal-100 border-t-[#0e4d46] rounded-full animate-spin"></div>
+        <p className="text-slate-500 font-bold animate-pulse">Syncing team metrics...</p>
+      </div>
+    );
+  }
+
+  if (error || !memberStats || Object.keys(memberStats).length === 0) {
+    return (
+      <div className="bg-red-50 p-10 rounded-3xl border border-[#0e4d46]/10 text-center min-h-[300px] flex flex-col justify-center items-center w-full">
+        <p className="text-red-600 font-bold mb-4">{error || 'No sales representatives found in the team.'}</p>
+        <button 
+          onClick={() => window.location.reload()}
+          className="bg-[#0e4d46] text-white px-6 py-2.5 rounded-xl font-bold text-sm hover:bg-[#0a3d37] transition-colors"
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
 
   // Filter Logic
   const filteredMembers = Object.keys(memberStats).filter(name => 
@@ -148,7 +71,7 @@ const TeamOverview = () => {
     memberStats[name].role.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const activeData = memberStats[selectedMemberName];
+  const activeData = memberStats[selectedMemberName] || memberStats[Object.keys(memberStats)[0]];
 
   const quotaPieData = [
     { name: 'Achieved', value: activeData.quota, color: '#0e4d46' },
@@ -392,11 +315,11 @@ const TeamOverview = () => {
                 <div className="flex justify-between border-t border-gray-100 pt-5 mt-auto">
                   <div>
                     <div className="text-[9px] text-[#5a827d] font-bold uppercase tracking-widest mb-1">Active Deals</div>
-                    <div className="text-lg font-extrabold text-[#0e4d46]">12</div>
+                    <div className="text-lg font-extrabold text-[#0e4d46]">{activeData.activeDeals || 0}</div>
                   </div>
                   <div className="text-right">
                     <div className="text-[9px] text-[#5a827d] font-bold uppercase tracking-widest mb-1">Pipeline Value</div>
-                    <div className="text-lg font-extrabold text-[#0e4d46]">$420k</div>
+                    <div className="text-lg font-extrabold text-[#0e4d46]">{activeData.pipelineValue || '$0'}</div>
                   </div>
                 </div>
               </div>

@@ -7,7 +7,9 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 
-from .serializers import LoginSerializer, LogoutSerializer, SignupSerializer
+from leads.serializers import LoginSerializer, LogoutSerializer, SignupSerializer
+from rest_framework_simplejwt.serializers import TokenRefreshSerializer
+from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 
 logger = logging.getLogger(__name__)
 
@@ -225,6 +227,69 @@ def logout(request):
             {"success": False, "errors": {"non_field_errors": ["Logout failed. Token may already be invalid."]}},
             status=status.HTTP_400_BAD_REQUEST,
         )
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def cookie_token_refresh(request):
+    """
+    POST /api/token/refresh/
+    Reads refresh token from cookie or request body,
+    returns new access token in cookies and response.
+    """
+    refresh_token = request.COOKIES.get('refresh_token') or request.data.get('refresh')
+    
+    if not refresh_token:
+        return Response(
+            {"detail": "Refresh token is required."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+        
+    serializer = TokenRefreshSerializer(data={'refresh': refresh_token})
+    
+    try:
+        serializer.is_valid(raise_exception=True)
+    except (InvalidToken, TokenError):
+        return Response(
+            {"detail": "Invalid or expired refresh token."},
+            status=status.HTTP_401_UNAUTHORIZED
+        )
+        
+    result = serializer.validated_data
+    access_token = result.get('access')
+    new_refresh_token = result.get('refresh')
+    
+    response = Response(
+        {
+            "success": True,
+            "access": access_token,
+            **({"refresh": new_refresh_token} if new_refresh_token else {})
+        },
+        status=status.HTTP_200_OK
+    )
+    
+    # Set HttpOnly Cookie for access token
+    response.set_cookie(
+        key='access_token',
+        value=access_token,
+        httponly=True,
+        secure=not settings.DEBUG,
+        samesite='Lax',
+        max_age=3600 * 2 # 2 hours
+    )
+    
+    # Set HttpOnly Cookie for refresh token if it was rotated
+    if new_refresh_token:
+        response.set_cookie(
+            key='refresh_token',
+            value=new_refresh_token,
+            httponly=True,
+            secure=not settings.DEBUG,
+            samesite='Lax',
+            max_age=3600 * 24 # 24 hours
+        )
+        
+    return response
 
 
 # ---------------------------------------------------------------------------

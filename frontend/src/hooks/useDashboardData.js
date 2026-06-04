@@ -17,8 +17,6 @@ const useDashboardData = () => {
             if (err.response?.status === 401) {
                 // Force logout and re-sync if unauthorized
                 localStorage.removeItem('leadflow_user');
-                localStorage.removeItem('access');
-                localStorage.removeItem('refresh');
                 window.location.href = '/login';
             }
             setError(err.message || 'Failed to fetch dashboard data');

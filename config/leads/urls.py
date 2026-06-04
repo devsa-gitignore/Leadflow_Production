@@ -1,6 +1,6 @@
 from django.urls import path
-from . import views
-from . import auth_views
+from leads import views
+from leads import auth_views
 
 urlpatterns = [
     # ── Auth ──────────────────────────────────────────────────────────────
@@ -8,6 +8,7 @@ urlpatterns = [
     path('auth/login/',  auth_views.login,  name='auth-login'),
     path('auth/logout/', auth_views.logout, name='auth-logout'),
     path('dashboard/stats/', views.DashboardDataView.as_view(), name='dashboard-stats'),
+    path('team/', views.team_overview_data, name='team-overview'),
     # ── Notifications ──────────────────────────────────────────────────────
     path('notifications/', views.notifications_list, name='notifications-list'),
     path('notifications/mark-all-read/', views.notifications_mark_all_read, name='notifications-mark-all-read'),
