@@ -35,7 +35,7 @@ const Invoices = () => {
           day: '2-digit',
           year: 'numeric'
         }),
-        amount: `$${parseFloat(inv.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
+        amount: `₹${parseFloat(inv.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
         status: (inv.status || 'pending').toUpperCase(),
         rawAmount: parseFloat(inv.amount)
       }));
@@ -128,19 +128,19 @@ const Invoices = () => {
 
     return [
       {
-        title: 'Total Invoiced', value: `$${total.toLocaleString()}`, subtext: 'Updated live', subColor: 'text-emerald-500',
+        title: 'Total Invoiced', value: `₹${total.toLocaleString()}`, subtext: 'Updated live', subColor: 'text-emerald-500',
         icon: <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
       },
       {
-        title: 'Pending Payments', value: `$${pending.toLocaleString()}`, subtext: `${pendingCount} invoices pending`, subColor: 'text-slate-400',
+        title: 'Pending Payments', value: `₹${pending.toLocaleString()}`, subtext: `${pendingCount} invoices pending`, subColor: 'text-slate-400',
         icon: <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
       },
       {
-        title: 'Paid', value: `$${paid.toLocaleString()}`, subtext: 'Successfully processed', subColor: 'text-emerald-500',
+        title: 'Paid', value: `₹${paid.toLocaleString()}`, subtext: 'Successfully processed', subColor: 'text-emerald-500',
         icon: <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
       },
       {
-        title: 'Overdue', value: `$${overdue.toLocaleString()}`, textColor: 'text-red-500', subtext: `${overdueCount} invoices overdue`, subColor: 'text-red-400',
+        title: 'Overdue', value: `₹${overdue.toLocaleString()}`, textColor: 'text-red-500', subtext: `${overdueCount} invoices overdue`, subColor: 'text-red-400',
         icon: <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
       }
     ];

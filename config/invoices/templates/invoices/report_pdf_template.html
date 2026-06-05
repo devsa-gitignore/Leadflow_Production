@@ -127,7 +127,7 @@
     <div class="section-title">Invoice Summary</div>
     <div class="summary-card">
         <div class="summary-title">Total Value Invoiced</div>
-        <div class="value">${{ report.invoices.total_value|floatformat:2 }}</div>
+        <div class="value">₹{{ report.invoices.total_value|floatformat:2 }}</div>
     </div>
     
     <table class="data-table">
@@ -160,7 +160,7 @@
     <div class="section-title">Payments &amp; Collections</div>
     <div class="summary-card">
         <div class="summary-title">Total Collected Revenue</div>
-        <div class="value">${{ report.payments.total_collected|floatformat:2 }}</div>
+        <div class="value">₹{{ report.payments.total_collected|floatformat:2 }}</div>
     </div>
 
     <table class="data-table">
@@ -177,7 +177,7 @@
             </tr>
             <tr>
                 <td>Total Revenue Collected</td>
-                <td style="text-align: right; font-weight: bold; color: #0e4d46;">${{ report.payments.total_collected|floatformat:2 }}</td>
+                <td style="text-align: right; font-weight: bold; color: #0e4d46;">₹{{ report.payments.total_collected|floatformat:2 }}</td>
             </tr>
         </tbody>
     </table>

@@ -63,7 +63,7 @@ class DashboardDataView(APIView):
             team_data.append({
                 "name": member.first_name,
                 "deals": member_deals.filter(is_won=True).count(),
-                "revenue": f"${member_revenue:,.0f}",
+                "revenue": f"₹{member_revenue:,.0f}",
                 "conv": f"{(member_deals.filter(is_won=True).count() / member_leads.count() * 100 if member_leads.count() > 0 else 0):.0f}%",
                 "followUps": followups.filter(user=member, status='pending').count()
             })
@@ -78,8 +78,10 @@ class DashboardDataView(APIView):
             {
                 "id": m.id,
                 "title": m.title,
-                "time": f"{m.start_time.strftime('%I:%M %p')} - {m.end_time.strftime('%I:%M %p')}",
-                "date": m.start_time.strftime('%b %d, %Y'),
+                "time": f"{timezone.localtime(m.start_time).strftime('%I:%M %p')} - {timezone.localtime(m.end_time).strftime('%I:%M %p')}",
+                "date": timezone.localtime(m.start_time).strftime('%b %d, %Y'),
+                "start_time": m.start_time.isoformat(),
+                "end_time": m.end_time.isoformat(),
                 "location": m.location,
             }
             for m in upcoming_meetings
@@ -91,7 +93,7 @@ class DashboardDataView(APIView):
             {
                 "id": t.id,
                 "task": t.title,
-                "due": t.due_date.strftime('%b %d, %I:%M %p') if t.due_date else 'No due date',
+                "due": timezone.localtime(t.due_date).strftime('%b %d, %I:%M %p') if t.due_date else 'No due date',
                 "priority": t.priority,
                 "completed": t.is_completed
             }
@@ -100,8 +102,8 @@ class DashboardDataView(APIView):
 
         return Response({
             "stats": [
-                { "label": 'TOTAL PIPELINE VALUE', "value": float(total_pipeline/1000000), "prefix": '$', "suffix": 'M', "trend": '+6%', "positive": True },
-                { "label": 'TOTAL REVENUE', "value": float(total_revenue/1000), "prefix": '$', "suffix": 'k', "trend": '+8%', "positive": True },
+                { "label": 'TOTAL PIPELINE VALUE', "value": float(total_pipeline/1000000), "prefix": '₹', "suffix": 'M', "trend": '+6%', "positive": True },
+                { "label": 'TOTAL REVENUE', "value": float(total_revenue/1000), "prefix": '₹', "suffix": 'k', "trend": '+8%', "positive": True },
                 { "label": 'TEAM CONVERSION', "value": round(conversion_rate), "prefix": '', "suffix": '%', "trend": '-2%', "positive": False },
                 { "label": 'OVERDUE FOLLOW-UPS', "value": overdue_followups, "prefix": '', "suffix": '', "trend": '5%', "positive": True },
                 { "label": 'DEALS CLOSING', "value": deals_closing_soon, "prefix": '', "suffix": '', "trend": '+4%', "positive": True },
@@ -144,8 +146,10 @@ class DashboardDataView(APIView):
             {
                 "id": m.id,
                 "title": m.title,
-                "time": f"{m.start_time.strftime('%I:%M %p')} - {m.end_time.strftime('%I:%M %p')}",
-                "date": m.start_time.strftime('%b %d, %Y'),
+                "time": f"{timezone.localtime(m.start_time).strftime('%I:%M %p')} - {timezone.localtime(m.end_time).strftime('%I:%M %p')}",
+                "date": timezone.localtime(m.start_time).strftime('%b %d, %Y'),
+                "start_time": m.start_time.isoformat(),
+                "end_time": m.end_time.isoformat(),
                 "location": m.location,
             }
             for m in upcoming_meetings
@@ -157,7 +161,7 @@ class DashboardDataView(APIView):
             {
                 "id": t.id,
                 "task": t.title,
-                "due": t.due_date.strftime('%b %d, %I:%M %p') if t.due_date else 'No due date',
+                "due": timezone.localtime(t.due_date).strftime('%b %d, %I:%M %p') if t.due_date else 'No due date',
                 "priority": t.priority,
                 "completed": t.is_completed
             }
@@ -167,7 +171,7 @@ class DashboardDataView(APIView):
         return Response({
             "stats": [
                 { "label": 'LEADS ASSIGNED TODAY', "value": leads_today, "prefix": '', "suffix": '', "trend": '+5%', "positive": True },
-                { "label": 'MY PIPELINE VALUE', "value": float(pipeline_value/1000), "prefix": '$', "suffix": 'k', "trend": '+8%', "positive": True },
+                { "label": 'MY PIPELINE VALUE', "value": float(pipeline_value/1000), "prefix": '₹', "suffix": 'k', "trend": '+8%', "positive": True },
                 { "label": 'PERSONAL CONVERSION', "value": round(conversion_rate), "prefix": '', "suffix": '%', "trend": '-2%', "positive": False },
                 { "label": 'PENDING FOLLOW-UPS', "value": pending_followups, "prefix": '0', "suffix": '', "trend": '+1%', "positive": True },
             ],
@@ -330,13 +334,13 @@ def team_overview_data(request):
         # Average Deal Size
         avg_deal_value = won_deals.aggregate(avg=Sum('deal_value'))['avg'] or 0
         avg_deal_val = (avg_deal_value / won_count) if won_count > 0 else 0
-        avg_deal_str = f"${avg_deal_val/1000:.1f}k" if avg_deal_val >= 1000 else f"${avg_deal_val:.0f}"
+        avg_deal_str = f"₹{avg_deal_val/1000:.1f}k" if avg_deal_val >= 1000 else f"₹{avg_deal_val:.0f}"
         
         # Quota target: let's assume a default quota target of $150,000 for everyone
         quota_target = 150000
         quota_pct = int((won_revenue / quota_target) * 100) if quota_target > 0 else 0
         to_target_val = max(0, quota_target - won_revenue)
-        to_target_str = "$0 (Met)" if to_target_val == 0 else f"${to_target_val/1000:.1f}k"
+        to_target_str = "₹0 (Met)" if to_target_val == 0 else f"₹{to_target_val/1000:.1f}k"
         
         # Outbound calls (mock/realistic using FollowUps)
         calls_count = FollowUp.objects.filter(user=rep, status='done').count()
@@ -385,7 +389,7 @@ def team_overview_data(request):
         active_deals = rep_deals.filter(is_won=False, is_lost=False)
         active_deals_count = active_deals.count()
         active_deals_value = active_deals.aggregate(total=Sum('deal_value'))['total'] or 0
-        pipeline_val_str = f"${active_deals_value/1000:.0f}k" if active_deals_value >= 1000 else f"${active_deals_value:.0f}"
+        pipeline_val_str = f"₹{active_deals_value/1000:.0f}k" if active_deals_value >= 1000 else f"₹{active_deals_value:.0f}"
             
         # Tags
         tags = []
@@ -404,7 +408,7 @@ def team_overview_data(request):
         data[rep_name] = {
             "role": rep.role.name if rep.role else 'Sales Rep',
             "tags": tags,
-            "revenue": f"${won_revenue:,.0f}",
+            "revenue": f"₹{won_revenue:,.0f}",
             "winRate": f"{win_rate:.1f}%",
             "calls": calls_str,
             "meetings": str(meetings_count),

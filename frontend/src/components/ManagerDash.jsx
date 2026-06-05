@@ -38,6 +38,35 @@ const AnimatedNumber = ({ value, prefix = '', suffix = '', isCurrency = false, d
   return <>{prefix}{formatted}{suffix}</>;
 };
 
+const formatMeetingTime = (meeting) => {
+  if (meeting.start_time && meeting.end_time) {
+    try {
+      const start = new Date(meeting.start_time);
+      const end = new Date(meeting.end_time);
+      const timeOptions = { hour: '2-digit', minute: '2-digit', hour12: true };
+      const startTimeStr = start.toLocaleTimeString('en-US', timeOptions);
+      const endTimeStr = end.toLocaleTimeString('en-US', timeOptions);
+      return `${startTimeStr} - ${endTimeStr}`;
+    } catch (e) {
+      console.error("Error formatting meeting time", e);
+    }
+  }
+  return meeting.time;
+};
+
+const formatMeetingDate = (meeting) => {
+  if (meeting.start_time) {
+    try {
+      const start = new Date(meeting.start_time);
+      const dateOptions = { month: 'short', day: '2-digit', year: 'numeric' };
+      return start.toLocaleDateString('en-US', dateOptions);
+    } catch (e) {
+      console.error("Error formatting meeting date", e);
+    }
+  }
+  return meeting.date;
+};
+
 const ManagerDash = () => {
   const { data: dashboardData, loading: dashboardLoading, error: dashboardError } = useDashboardData();
   const [pipelineData, setPipelineData] = useState(null);
@@ -159,7 +188,7 @@ const ManagerDash = () => {
                    <h3 className="text-[10px] font-bold text-[#5a827d] uppercase tracking-wider">{stage.stage_name}</h3>
                    <span className="text-[10px] font-bold px-2 py-0.5 bg-gray-50 text-[#0e4d46] rounded-full">{stage.count}</span>
                 </div>
-                <p className="text-lg font-bold text-[#0e4d46]">${(stage.total_value/1000).toFixed(1)}k</p>
+                <p className="text-lg font-bold text-[#0e4d46]">₹{(stage.total_value/1000).toFixed(1)}k</p>
               </div>
             ))}
           </div>
@@ -259,13 +288,13 @@ const ManagerDash = () => {
                       <div className="text-center">
                         <p className="text-[10px] font-bold text-[#5a827d] uppercase mb-1">Current Achieved</p>
                         <p className="text-lg font-bold text-[#0e4d46]">
-                          <AnimatedNumber value={currentRevenue} prefix="$" isCurrency duration={1500} />
+                          <AnimatedNumber value={currentRevenue} prefix="₹" isCurrency duration={1500} />
                         </p>
                       </div>
                       <div className="text-center">
                         <p className="text-[10px] font-bold text-[#5a827d] uppercase mb-1">Goal Target</p>
                         <p className="text-lg font-bold text-[#0e4d46]">
-                          <AnimatedNumber value={target} prefix="$" isCurrency duration={1500} />
+                          <AnimatedNumber value={target} prefix="₹" isCurrency duration={1500} />
                         </p>
                       </div>
                     </div>
@@ -281,7 +310,7 @@ const ManagerDash = () => {
                 {(dashboardData?.meetings || []).map((meeting, i) => (
                   <div key={i} className="p-4 rounded-2xl bg-[#f8fafb] border border-gray-50 group hover:border-[#0e4d46]/20 transition-all cursor-pointer">
                       <p className="text-xs font-bold text-[#0e4d46] mb-1">{meeting.title}</p>
-                      <p className="text-[10px] font-medium text-[#5a827d]">{meeting.time} • {meeting.date}</p>
+                      <p className="text-[10px] font-medium text-[#5a827d]">{formatMeetingTime(meeting)} • {formatMeetingDate(meeting)}</p>
                   </div>
                 ))}
                 {(!dashboardData?.meetings || dashboardData.meetings.length === 0) && (

@@ -47,7 +47,7 @@ const MyPipeline = () => {
             id: deal.id,
             title: deal.title,
             company: deal.company || deal.title,
-            value: `$${parseFloat(deal.deal_value).toLocaleString()}`,
+            value: `₹${parseFloat(deal.deal_value).toLocaleString()}`,
             tag: deal.result ? deal.result : (deal.priority || 'medium').toUpperCase() + ' PRIORITY',
             result: deal.result,
             assignedTo: deal.assigned_to_name || null,
@@ -73,7 +73,7 @@ const MyPipeline = () => {
             id: deal.id,
             title: deal.title,
             company: deal.company || deal.title,
-            value: `$${parseFloat(deal.deal_value).toLocaleString()}`,
+            value: `₹${parseFloat(deal.deal_value).toLocaleString()}`,
             tag: deal.result ? deal.result : (deal.priority || 'medium').toUpperCase() + ' PRIORITY',
             result: deal.result,
             assignedTo: deal.assigned_to_name || null,
@@ -92,7 +92,7 @@ const MyPipeline = () => {
           id: deal.id,
           title: deal.title,
           company: deal.company || deal.title,
-          value: `$${parseFloat(deal.deal_value).toLocaleString()}`,
+          value: `₹${parseFloat(deal.deal_value).toLocaleString()}`,
           tag: 'WON',
           result: 'WON',
           assignedTo: deal.assigned_to_name || null,
@@ -101,7 +101,7 @@ const MyPipeline = () => {
           id: deal.id,
           title: deal.title,
           company: deal.company || deal.title,
-          value: `$${parseFloat(deal.deal_value).toLocaleString()}`,
+          value: `₹${parseFloat(deal.deal_value).toLocaleString()}`,
           tag: 'LOST',
           result: 'LOST',
           assignedTo: deal.assigned_to_name || null,
@@ -487,7 +487,7 @@ const MyPipeline = () => {
                   value={newDealTitle} onChange={e => setNewDealTitle(e.target.value)}
                 />
                 <input 
-                  required type="number" placeholder="Deal Value ($)" 
+                  required type="number" placeholder="Deal Value (₹)" 
                   className="w-full px-4 py-3 bg-[#f8fafb] rounded-xl border border-gray-100 font-bold text-sm"
                   value={newDealValue} onChange={e => setNewDealValue(e.target.value)}
                 />

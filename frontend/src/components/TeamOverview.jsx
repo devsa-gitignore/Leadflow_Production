@@ -82,7 +82,7 @@ const TeamOverview = () => {
     if (active && payload && payload.length) {
       return (
         <div className="bg-white p-3 shadow-lg rounded-xl border border-gray-100 text-sm font-bold text-[#0e4d46]">
-          {payload[0].payload.name}: ${payload[0].value}k
+          {payload[0].payload.name}: ₹{payload[0].value}k
         </div>
       );
     }
@@ -197,7 +197,7 @@ const TeamOverview = () => {
               <div className="lg:col-span-8 grid grid-cols-1 sm:grid-cols-2 gap-5 order-2 lg:order-1">
                 <div className="bg-white p-6 rounded-3xl shadow-sm border border-teal-50 flex items-center gap-5 transition-transform hover:-translate-y-1">
                   <div className="w-12 h-12 rounded-full bg-[#f0f9f7] text-[#0e4d46] flex items-center justify-center shrink-0">
-                    <span className="font-extrabold text-xl">$</span>
+                    <span className="font-extrabold text-xl">₹</span>
                   </div>
                   <div className="min-w-0">
                     <div className="text-[11px] text-[#5a827d] font-bold uppercase tracking-widest mb-1">Total Revenue</div>
@@ -319,7 +319,7 @@ const TeamOverview = () => {
                   </div>
                   <div className="text-right">
                     <div className="text-[9px] text-[#5a827d] font-bold uppercase tracking-widest mb-1">Pipeline Value</div>
-                    <div className="text-lg font-extrabold text-[#0e4d46]">{activeData.pipelineValue || '$0'}</div>
+                    <div className="text-lg font-extrabold text-[#0e4d46]">{activeData.pipelineValue || '₹0'}</div>
                   </div>
                 </div>
               </div>

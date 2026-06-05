@@ -176,7 +176,7 @@ const ProfilePage = () => {
             ))}
           </div>
           <div className="grid grid-cols-2 gap-4">
-            <div className="bg-[#f0f7f6] p-5 rounded-[24px] text-center border border-[#0e4d46]/5 hover:scale-105 transition-transform duration-300"><p className="text-[10px] font-black text-[#5a827d] uppercase tracking-widest mb-1">REVENUE</p><p className="text-xl font-black text-[#0e4d46]">{isLoaded && <MovingNumber value="1.2" prefix="$" suffix="M" />}</p></div>
+            <div className="bg-[#f0f7f6] p-5 rounded-[24px] text-center border border-[#0e4d46]/5 hover:scale-105 transition-transform duration-300"><p className="text-[10px] font-black text-[#5a827d] uppercase tracking-widest mb-1">REVENUE</p><p className="text-xl font-black text-[#0e4d46]">{isLoaded && <MovingNumber value="1.2" prefix="₹" suffix="M" />}</p></div>
             <div className="bg-[#f0f7f6] p-5 rounded-[24px] text-center border border-[#0e4d46]/5 hover:scale-105 transition-transform duration-300"><p className="text-[10px] font-black text-[#5a827d] uppercase tracking-widest mb-1">GROWTH</p><p className="text-xl font-black text-emerald-600">{isLoaded && <MovingNumber value="14" prefix="+" suffix="%" />}</p></div>
           </div>
         </div>

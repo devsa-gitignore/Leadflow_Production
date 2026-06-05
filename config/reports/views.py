@@ -156,7 +156,7 @@ def reports_dashboard(request):
         overdue_invoices.append({
             "invoice_id": inv.id,
             "company": company,
-            "amount": f"${inv.amount:,.2f}",
+            "amount": f"₹{inv.amount:,.2f}",
             "days": overdue_days,
             "isCritical": overdue_days >= 30,
         })
@@ -310,7 +310,7 @@ def reports_summary(request):
         overdue_invoices.append({
             "invoice_id": inv.id,
             "company": company,
-            "amount": f"${inv.amount:,.2f}",
+            "amount": f"₹{inv.amount:,.2f}",
             "days": overdue_days,
             "isCritical": overdue_days >= 30,
         })

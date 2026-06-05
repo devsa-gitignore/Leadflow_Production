@@ -60,6 +60,7 @@ def pipeline_view(request):
 
 
 @api_view(['PATCH'])
+@permission_classes([IsAuthenticated])
 def update_deal_stage(request, deal_id):
 
     user = request.user  
@@ -85,6 +86,7 @@ def update_deal_stage(request, deal_id):
 
 
 @api_view(['PATCH'])
+@permission_classes([IsAuthenticated])
 def close_deal(request, deal_id):
 
     user = request.user  

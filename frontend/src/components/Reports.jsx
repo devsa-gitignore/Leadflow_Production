@@ -76,7 +76,7 @@ const hardcodedData = {
       { name: 'Priya Jadhav', leads: 3600, conversions: 680, rate: '18.8%', perf: 'EXCELLENT', perfColor: 'bg-emerald-100/70 text-emerald-600' }
     ],
     overdue: [
-      { company: 'Nova Systems', amount: '$4,120.00', days: 14, isCritical: false }
+      { company: 'Nova Systems', amount: '₹4,120.00', days: 14, isCritical: false }
     ]
   },
   'Last 30 Days': {
@@ -108,10 +108,10 @@ const hardcodedData = {
       { name: 'Priya Jadhav', leads: 156, conversions: 28, rate: '17.9%', perf: 'ON TRACK', perfColor: 'bg-slate-100 text-slate-500' }
     ],
     overdue: [
-      { company: 'Acme Global Ltd', amount: '$12,400.00', days: 45, isCritical: true },
-      { company: 'TechSphere Inc', amount: '$8,250.00', days: 32, isCritical: true },
-      { company: 'Nova Systems', amount: '$4,120.00', days: 14, isCritical: false },
-      { company: 'Summit Corp', amount: '$2,800.00', days: 8, isCritical: false }
+      { company: 'Acme Global Ltd', amount: '₹12,400.00', days: 45, isCritical: true },
+      { company: 'TechSphere Inc', amount: '₹8,250.00', days: 32, isCritical: true },
+      { company: 'Nova Systems', amount: '₹4,120.00', days: 14, isCritical: false },
+      { company: 'Summit Corp', amount: '₹2,800.00', days: 8, isCritical: false }
     ]
   },
   'Last Week': {
@@ -146,8 +146,8 @@ const hardcodedData = {
       { name: 'Priya Jadhav', leads: 60, conversions: 15, rate: '25.0%', perf: 'EXCELLENT', perfColor: 'bg-emerald-100/70 text-emerald-600' }
     ],
     overdue: [
-      { company: 'Acme Global Ltd', amount: '$12,400.00', days: 45, isCritical: true },
-      { company: 'TechSphere Inc', amount: '$8,250.00', days: 32, isCritical: true }
+      { company: 'Acme Global Ltd', amount: '₹12,400.00', days: 45, isCritical: true },
+      { company: 'TechSphere Inc', amount: '₹8,250.00', days: 32, isCritical: true }
     ]
   },
   'Yesterday': {
@@ -181,7 +181,7 @@ const hardcodedData = {
       { name: 'Priya Jadhav', leads: 8, conversions: 2, rate: '25.0%', perf: 'ON TRACK', perfColor: 'bg-slate-100 text-slate-500' }
     ],
     overdue: [
-      { company: 'Nova Systems', amount: '$4,120.00', days: 14, isCritical: false }
+      { company: 'Nova Systems', amount: '₹4,120.00', days: 14, isCritical: false }
     ]
   }
 };
@@ -425,8 +425,8 @@ const Reports = () => {
       return (
         <div className="bg-white p-3 shadow-lg rounded-xl border border-gray-100 text-xs font-bold text-[#0e4d46]">
           <div className="mb-1 text-slate-400">{payload[0].payload.month}</div>
-          <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-[#0e4d46]"></div> Current: ${currentVal.toLocaleString()}</div>
-          <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-[#cbdad8]"></div> Previous: ${previousVal.toLocaleString()}</div>
+          <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-[#0e4d46]"></div> Current: ₹{currentVal.toLocaleString()}</div>
+          <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-[#cbdad8]"></div> Previous: ₹{previousVal.toLocaleString()}</div>
         </div>
       );
     }
@@ -515,7 +515,7 @@ const Reports = () => {
             </div>
             <div className="flex items-baseline gap-3 mb-6">
               <span className="text-2xl md:text-3xl font-extrabold text-[#0e4d46]">
-                <AnimatedNumber value={data.totalRevenue} prefix="$" isCurrency duration={1500} />
+                <AnimatedNumber value={data.totalRevenue} prefix="₹" isCurrency duration={1500} />
               </span>
               <span className="text-[10px] font-extrabold text-emerald-500 tracking-wide">+12.5%</span>
             </div>
@@ -628,13 +628,13 @@ const Reports = () => {
                       <div className="flex justify-between items-center text-[10px]">
                         <span className="text-[#5a827d] font-bold uppercase tracking-widest">Achieved</span>
                         <span className="text-[#0e4d46] font-extrabold">
-                          <AnimatedNumber value={achievedAmount} prefix="$" isCurrency duration={1500} />
+                          <AnimatedNumber value={achievedAmount} prefix="₹" isCurrency duration={1500} />
                         </span>
                       </div>
                       <div className="flex justify-between items-center text-[10px]">
                         <span className="text-[#5a827d] font-bold uppercase tracking-widest">Target</span>
                         <span className="text-[#0e4d46] font-extrabold">
-                          <AnimatedNumber value={targetAmount} prefix="$" isCurrency duration={1500} />
+                          <AnimatedNumber value={targetAmount} prefix="₹" isCurrency duration={1500} />
                         </span>
                       </div>
                     </div>
@@ -839,7 +839,7 @@ const Reports = () => {
               <div className="bg-white p-6 md:p-8 rounded-[2rem] shadow-[0_2px_10px_rgb(0,0,0,0.02)] border border-gray-100/50 flex flex-col hover:-translate-y-1 hover:shadow-md transition-all duration-300">
                 <div className="text-[10px] text-[#5a827d] font-extrabold uppercase tracking-widest mb-3">Invoice Overview</div>
                 <h3 className="text-2xl md:text-3xl font-extrabold text-[#0e4d46] mb-6 flex items-baseline gap-1">
-                  <AnimatedNumber value={financialReport.invoices.total_value} prefix="$" isCurrency duration={1000} />
+                  <AnimatedNumber value={financialReport.invoices.total_value} prefix="₹" isCurrency duration={1000} />
                   <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Total Value</span>
                 </h3>
                 
@@ -867,7 +867,7 @@ const Reports = () => {
               <div className="bg-white p-6 md:p-8 rounded-[2rem] shadow-[0_2px_10px_rgb(0,0,0,0.02)] border border-gray-100/50 flex flex-col hover:-translate-y-1 hover:shadow-md transition-all duration-300">
                 <div className="text-[10px] text-[#5a827d] font-extrabold uppercase tracking-widest mb-3">Collected Collections</div>
                 <h3 className="text-2xl md:text-3xl font-extrabold text-emerald-600 mb-6 flex items-baseline gap-1">
-                  <AnimatedNumber value={financialReport.payments.total_collected} prefix="$" isCurrency duration={1000} />
+                  <AnimatedNumber value={financialReport.payments.total_collected} prefix="₹" isCurrency duration={1000} />
                   <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Total Received</span>
                 </h3>
                 
@@ -879,7 +879,7 @@ const Reports = () => {
                   <div className="flex justify-between items-center py-2 border-b border-gray-50">
                     <span className="text-xs font-bold text-slate-400">Average Transaction</span>
                     <span className="text-xs font-extrabold text-[#0e4d46]">
-                      ${(financialReport.payments.transaction_count > 0 
+                      ₹{(financialReport.payments.transaction_count > 0 
                         ? (financialReport.payments.total_collected / financialReport.payments.transaction_count) 
                         : 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
@@ -938,7 +938,7 @@ const Reports = () => {
                       
                       <div className="w-full text-center mt-4">
                         <p className="text-xs font-bold text-[#5a827d]">
-                          Collected <span className="text-emerald-600 font-extrabold">${totalCollected.toLocaleString()}</span> out of <span className="text-[#0e4d46] font-extrabold">${totalInvoiced.toLocaleString()}</span> invoiced values.
+                          Collected <span className="text-emerald-600 font-extrabold">₹{totalCollected.toLocaleString()}</span> out of <span className="text-[#0e4d46] font-extrabold">₹{totalInvoiced.toLocaleString()}</span> invoiced values.
                         </p>
                       </div>
                     </>

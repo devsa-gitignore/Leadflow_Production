@@ -21,7 +21,7 @@ def _create_meeting_notifications(event, actor, verb):
         Notification.objects.create(
             sender=actor,
             receiver=recipient,
-            message=f'{verb}: "{event.title}" on {event.start_time.strftime("%b %d, %Y at %I:%M %p")}',
+            message=f'{verb}: "{event.title}" on {timezone.localtime(event.start_time).strftime("%b %d, %Y at %I:%M %p")}',
             type='meeting',
         )
 
@@ -70,7 +70,7 @@ def check_reminders(request):
                 Notification.objects.create(
                     sender=event.user,
                     receiver=user,
-                    message=f'Reminder: "{event.title}" starts in {label} ({event.start_time.strftime("%b %d at %I:%M %p")})',
+                    message=f'Reminder: "{event.title}" starts in {label} ({timezone.localtime(event.start_time).strftime("%b %d at %I:%M %p")})',
                     type='meeting',
                 )
                 sent.append(offset_minutes)

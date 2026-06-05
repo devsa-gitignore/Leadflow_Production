@@ -182,7 +182,7 @@ const Navbar2 = ({ userName, userRole, profileImage, placeholder, toggleSidebar 
                     <span className="text-sm font-bold text-[#0e4d46]">{deal.company || deal.title}</span>
                     <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">{deal.stage_name || 'Active Deal'}</span>
                   </div>
-                  <span className="text-xs font-bold text-teal-600 bg-teal-50 px-2 py-1 rounded-md">${parseFloat(deal.deal_value).toLocaleString()}</span>
+                  <span className="text-xs font-bold text-teal-600 bg-teal-50 px-2 py-1 rounded-md">₹{parseFloat(deal.deal_value).toLocaleString()}</span>
                 </button>
               ))}
             </div>

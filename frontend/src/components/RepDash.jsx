@@ -36,6 +36,22 @@ const AnimatedNumber = ({ value, prefix = '', suffix = '', isCurrency = false, d
   return <>{prefix}{formatted}{suffix}</>;
 };
 
+const formatMeetingTime = (meeting) => {
+  if (meeting.start_time && meeting.end_time) {
+    try {
+      const start = new Date(meeting.start_time);
+      const end = new Date(meeting.end_time);
+      const timeOptions = { hour: '2-digit', minute: '2-digit', hour12: true };
+      const startTimeStr = start.toLocaleTimeString('en-US', timeOptions);
+      const endTimeStr = end.toLocaleTimeString('en-US', timeOptions);
+      return `${startTimeStr} - ${endTimeStr}`;
+    } catch (e) {
+      console.error("Error formatting meeting time", e);
+    }
+  }
+  return meeting.time;
+};
+
 const RepDash = () => {
   const { data, loading, error } = useDashboardData();
   const [user, setUser] = useState(null);
@@ -192,7 +208,7 @@ const RepDash = () => {
                 {meetings.map((meeting, i) => (
                   <div key={i} className="p-4 rounded-2xl bg-[#f8fafb] border border-gray-50 group hover:border-[#0e4d46]/20 transition-all cursor-pointer">
                       <p className="text-xs font-bold text-[#0e4d46] mb-1">{meeting.title}</p>
-                      <p className="text-[10px] font-medium text-[#5a827d]">{meeting.time}</p>
+                      <p className="text-[10px] font-medium text-[#5a827d]">{formatMeetingTime(meeting)}</p>
                   </div>
                 ))}
               </div>
