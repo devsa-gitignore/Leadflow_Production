@@ -90,10 +90,17 @@ const TeamOverview = () => {
   };
 
   return (
-    <div className="flex flex-col lg:flex-row w-full bg-[#ecf5f3] rounded-3xl overflow-hidden shadow-sm border border-teal-100">
-        
+    // <div className="flex flex-col lg:flex-row w-full bg-[#ecf5f3] rounded-3xl overflow-hidden shadow-sm border border-teal-100">
+    <div className="flex flex-col lg:flex-row  lg:h-screen overflow-hidden w-full bg-[#ecf5f3] rounded-3xl shadow-sm border border-teal-100">    
         {/* Left Panel: Team List */}
-        <div className="w-full lg:w-[320px] shrink-0 p-6 flex flex-col gap-6 border-b lg:border-b-0 lg:border-r border-teal-100/50 bg-[#e6f2f0]">
+        {/* <div className="w-full lg:w-[320px] shrink-0 p-6 flex flex-col gap-6 border-b lg:border-b-0 lg:border-r border-teal-100/50 bg-[#e6f2f0]"> */}
+        {/* <div className="w-full lg:w-[320px] shrink-0 p-6 flex flex-col gap-6 border-b lg:border-b-0 lg:border-r border-teal-100/50 bg-[#e6f2f0] lg:sticky lg:top-0 h-screen"> */}
+        <div className="w-full lg:w-[320px] shrink-0 p-6 flex flex-col gap-6 border-b lg:border-b-0 lg:border-r border-teal-100/50 bg-[#e6f2f0] h-screen overflow-y-auto [&::-webkit-scrollbar]:hidden"
+style={{
+  scrollbarWidth: 'none',
+  msOverflowStyle: 'none',
+}}
+>
           <h2 className="text-2xl font-bold text-[#0e4d46]">LeadFlow Team</h2>
           
           <div className="relative">
@@ -156,7 +163,15 @@ const TeamOverview = () => {
         </div>
 
         {/* Right Panel: Main Dashboard Specifics */}
-        <div className="flex-1 p-4 md:p-8 min-w-0">
+        {/* <div className="flex-1 p-4 md:p-8 min-w-0"> */}
+        <div
+  className="flex-1 p-4 md:p-8 min-w-0 overflow-y-auto h-screen [&::-webkit-scrollbar]:hidden"
+  style={{
+    scrollbarWidth: 'none',
+    msOverflowStyle: 'none',
+  }}
+>
+        {/* <div className="flex-1 p-4 md:p-8 min-w-0 overflow-y-auto h-screen"> */}
           <div className="max-w-5xl mx-auto space-y-6">
             
             {/* Header Profile Section */}

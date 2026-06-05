@@ -2,6 +2,7 @@ import React from 'react';
 import Navbar from './Navbar';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import teamIllustration from '../assets/teamillustration.png';
 
 const fadeInUp = {
   initial: { opacity: 0, y: 40 },
@@ -83,7 +84,8 @@ const Features = () => {
 
   return (
     <section className="py-20 px-5" id="overview">
-      <div className="container mx-auto text-center">
+      {/* <div className="container mx-auto text-center"> */}
+      <div className="max-w-6xl mx-auto text-center">
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           whileInView={{ opacity: 1, scale: 1 }}
@@ -133,7 +135,8 @@ const ModernTeams = () => {
 
   return (
     <section className="py-24 px-5 overflow-hidden">
-      <div className="container mx-auto grid grid-cols-1 lg:grid-cols-2 items-center gap-12 lg:gap-20">
+      {/* <div className="container mx-auto grid grid-cols-1 lg:grid-cols-2 items-center gap-12 lg:gap-20"> */}
+                <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 items-center gap-12 lg:gap-24">
         <motion.div 
           className="text-center lg:text-left"
           initial={{ opacity: 0, x: -50 }}
@@ -166,7 +169,7 @@ const ModernTeams = () => {
           viewport={{ once: true }}
           transition={{ duration: 0.8, ease: "easeOut" }}
         >
-          <div className="bg-white p-8 lg:p-10 rounded-2xl shadow-2xl shadow-black/5">
+          {/* <div className="bg-white p-8 lg:p-10 rounded-2xl shadow-2xl shadow-black/5">
             <div className="grid grid-cols-2 gap-5">
               {[1, 2, 3, 4].map(i => (
                 <motion.div 
@@ -181,7 +184,15 @@ const ModernTeams = () => {
                 </motion.div>
               ))}
             </div>
-          </div>
+          </div> */}
+                    
+          <div className="bg-white p-4 rounded-2xl shadow-2xl shadow-black/5">
+  <img
+    src={teamIllustration}
+    alt="Sales team collaboration"
+    className="w-full max-w-md object-contain rounded-xl mx-auto"
+  />
+</div>
         </motion.div>
       </div>
     </section>
@@ -192,7 +203,12 @@ const Footer = () => (
   <footer className="py-10 border-t border-primary/10">
     <div className="container mx-auto px-5 flex flex-col md:flex-row items-center justify-between gap-5 text-sm">
       <div className="flex items-center gap-2 font-sans font-extrabold text-lg text-black">
-        <div className="w-5 h-5 bg-black rounded" />
+        {/* <div className="w-5 h-5 bg-black rounded" /> */}
+        <img
+           src={"logo.png"}
+           alt="LeadFlow Logo"
+          className="w-8 h-8 object-contain -mr-1"
+          />
         <span>LeadFlow</span>
       </div>
       <ul className="flex gap-6 text-muted font-sans font-medium">

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import logo from '../assets/logo.png';
 
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -13,8 +14,15 @@ const Navbar = () => {
       transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
     >
       <div className="container mx-auto px-5 flex justify-between items-center">
-        <Link to="/" className="flex items-center gap-2.5 font-sans font-extrabold text-2xl text-black">
-          <div className="w-6 h-6 bg-black rounded" />
+        {/* <Link to="/" className="flex items-center gap-2.5 font-sans font-extrabold text-2xl text-black">
+          <div className="w-6 h-6 bg-black rounded" /> */}
+         <Link to="/" className="flex items-center gap-2 font-sans font-extrabold text-2xl text-black">
+          {/* <div className="w-6 h-6 bg-black rounded" /> */}
+          <img
+              src={"logo.png"}
+              alt="LeadFlow Logo"
+             className="w-15 h-10 object-contain"
+            />
           <span>LeadFlow</span>
         </Link>
         

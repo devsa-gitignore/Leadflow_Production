@@ -52,7 +52,13 @@ const Sidebar = ({ role,active }) => {
   return (
     <div className="w-64 bg-[#f8fafb] h-full border-r border-gray-200 flex flex-col relative overflow-y-auto custom-scrollbar">
       <div className="p-6 flex items-center gap-3 mb-8">
-        <div className="w-8 h-8 bg-black rounded shrink-0" />
+        {/* <div className="w-8 h-8 bg-black rounded shrink-0" /> */}
+        <img
+            src={"logo.png"
+            }
+            alt="LeadFlow Logo"
+            className="w-10 h-10 object-contain shrink-0 -mr-1"
+      />
         <span className="text-xl font-extrabold text-[#0e4d46]">LeadFlow</span>
       </div>
 

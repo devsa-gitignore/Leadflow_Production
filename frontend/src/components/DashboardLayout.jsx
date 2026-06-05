@@ -20,7 +20,7 @@ const DashboardLayout = ({ role, userName, userRole }) => {
 
       {/* Sidebar Container */}
       <div className={`
-        fixed inset-y-0 left-0 z-50 transform transition-transform duration-300 ease-in-out
+        fixed inset-y-0 left-0 z-[200] transform transition-transform duration-300 ease-in-out
         lg:static lg:translate-x-0 lg:h-full
         ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
       `}>
@@ -35,12 +35,17 @@ const DashboardLayout = ({ role, userName, userRole }) => {
             userRole={userRole}
             toggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
           />
+          
+          
           <div className="animate-in fade-in duration-500">
             <Outlet />
           </div>
+          
         </main>
       </div>
-    </div>
+
+      </div>
+    
   );
 };
 
