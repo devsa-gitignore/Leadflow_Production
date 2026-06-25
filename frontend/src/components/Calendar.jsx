@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { fetchCalendarEvents, createCalendarEvent, fetchUsers, updateCalendarEvent, deleteCalendarEvent } from '../services/calendarService';
 import { fetchPipelineData } from '../services/pipelineService';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion as Motion, AnimatePresence } from 'framer-motion';
 
 const getDateTimeParts = (value) => {
   const date = new Date(value);
@@ -551,13 +551,8 @@ const CreateEventView = ({ onSave, onCancel, onDelete, initialData, dealOptions 
 
   const [recurrence, setRecurrence] = useState(initialData?.recurrence || { frequency: 'none' });
 
-  useEffect(() => {
-    if (!selectedDealId) return;
-    const matchedDeal = dealOptions.find((deal) => String(deal.id) === selectedDealId);
-    if (matchedDeal?.leadId && String(matchedDeal.leadId) !== selectedLeadId) {
-      setSelectedLeadId(String(matchedDeal.leadId));
-    }
-  }, [dealOptions, selectedDealId]);
+  const selectedDeal = dealOptions.find((deal) => String(deal.id) === selectedDealId);
+  const resolvedSelectedLeadId = selectedDeal?.leadId ? String(selectedDeal.leadId) : selectedLeadId;
 
   const addAttendee = (user) => {
     setSelectedAttendees(prev => [...prev, user]);
@@ -604,7 +599,7 @@ const CreateEventView = ({ onSave, onCancel, onDelete, initialData, dealOptions 
       reminders,
       recurrence,
       dealId: selectedDealId ? Number(selectedDealId) : null,
-      leadId: selectedLeadId ? Number(selectedLeadId) : null,
+      leadId: resolvedSelectedLeadId ? Number(resolvedSelectedLeadId) : null,
       color,
       eventType,
     });
@@ -743,7 +738,7 @@ const CreateEventView = ({ onSave, onCancel, onDelete, initialData, dealOptions 
             </select>
             <div className="flex flex-wrap gap-2 text-[10px] font-bold uppercase tracking-widest">
               <span className="px-3 py-1 rounded-full bg-[#f0f7f6] text-[#0e4d46]">
-                Lead: {selectedLeadId || 'Not linked'}
+                Lead: {resolvedSelectedLeadId || 'Not linked'}
               </span>
             </div>
           </div>
@@ -1077,10 +1072,14 @@ const Calendar = ({ variant = 'mini' }) => {
     ? ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa']
     : ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 
+  const handleSelectedDayFullChange = useCallback((day) => {
+    setSelectedEventIdx(0);
+    setSelectedDayFull(day);
+  }, []);
+
   const selectedDayEvents = events[selectedDayFull] || [];
-  // Reset to first event whenever the selected day changes
-  useEffect(() => { setSelectedEventIdx(0); }, [selectedDayFull]);
-  const activeEvent = selectedDayEvents[selectedEventIdx] || selectedDayEvents[0];
+  const activeEventIdx = selectedEventIdx < selectedDayEvents.length ? selectedEventIdx : 0;
+  const activeEvent = selectedDayEvents[activeEventIdx] || selectedDayEvents[0];
   const meetingHref = activeEvent?.meetingLink
     ? (activeEvent.meetingLink.startsWith('http://') || activeEvent.meetingLink.startsWith('https://')
       ? activeEvent.meetingLink
@@ -1099,7 +1098,7 @@ const Calendar = ({ variant = 'mini' }) => {
     for (let i = 1; i <= daysIn; i++) dates.push(i);
 
     return (
-      <motion.div 
+      <Motion.div 
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex flex-col h-fit"
@@ -1134,7 +1133,7 @@ const Calendar = ({ variant = 'mini' }) => {
             ))}
           </div>
         </div>
-      </motion.div>
+      </Motion.div>
     );
   }
 
@@ -1146,12 +1145,12 @@ const Calendar = ({ variant = 'mini' }) => {
       const newDate = new Date(fullViewDate);
       newDate.setDate(fullViewDate.getDate() + direction);
       setFullViewDate(newDate);
-      setSelectedDayFull(newDate.getDate());
+      handleSelectedDayFullChange(newDate.getDate());
     } else if (view === 'Week') {
       const newDate = new Date(fullViewDate);
       newDate.setDate(fullViewDate.getDate() + (direction * 7));
       setFullViewDate(newDate);
-      setSelectedDayFull(newDate.getDate());
+      handleSelectedDayFullChange(newDate.getDate());
     } else if (view === 'Month') {
       setFullViewDate(new Date(fYear, fMonth + direction, 1));
     } else if (view === 'Year') {
@@ -1207,7 +1206,7 @@ const Calendar = ({ variant = 'mini' }) => {
       });
 
       setFullViewDate(new Date(targetDate));
-      setSelectedDayFull(targetDate.getDate());
+      handleSelectedDayFullChange(targetDate.getDate());
       await loadEvents();
     } catch (err) {
       console.error('Failed to reschedule event', err);
@@ -1257,7 +1256,7 @@ const Calendar = ({ variant = 'mini' }) => {
     } : null;
 
     return (
-      <motion.div 
+      <Motion.div 
         initial={{ opacity: 0, scale: 0.98 }}
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.98 }}
@@ -1311,7 +1310,7 @@ const Calendar = ({ variant = 'mini' }) => {
             }
           } : undefined}
           />
-      </motion.div>
+      </Motion.div>
     );
   }
 
@@ -1330,7 +1329,7 @@ const Calendar = ({ variant = 'mini' }) => {
                 <button onClick={() => handleNav(1)} className="p-1 text-[#5a827d] hover:text-[#0e4d46]"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg></button>
               </div>
               <button 
-                onClick={() => { setFullViewDate(new Date()); setSelectedDayFull(new Date().getDate()); }} 
+                onClick={() => { const todayDate = new Date(); setFullViewDate(todayDate); handleSelectedDayFullChange(todayDate.getDate()); }} 
                 className="px-4 py-1.5 border border-gray-200 rounded-lg text-sm font-bold text-[#5a827d] hover:bg-gray-50 transition-all"
               >
                 Today
@@ -1400,7 +1399,7 @@ const Calendar = ({ variant = 'mini' }) => {
         </div>
 
         <AnimatePresence mode="wait">
-          <motion.div
+          <Motion.div
             key={view + fullViewDate.getTime()}
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
@@ -1409,9 +1408,9 @@ const Calendar = ({ variant = 'mini' }) => {
           >
             {view === 'Year' ? <YearView fYear={fYear} today={today} getCalendarInfo={getCalendarInfo} /> : 
               view === 'Day' ? <DayView selectedDayFull={selectedDayFull} fullViewDate={fullViewDate} fYear={fYear} events={events} /> : 
-              view === 'Week' ? <WeekView fullViewDate={fullViewDate} today={today} allApiEvents={filteredApiEvents} setFullViewDate={setFullViewDate} setSelectedDayFull={setSelectedDayFull} onEventDragStart={handleEventDragStart} onDayDrop={handleEventDropToDate} dragOverKey={dragOverKey} setDragOverKey={setDragOverKey} /> :
-              <MonthView fYear={fYear} fMonth={fMonth} fFirstDay={fFirstDay} fDaysIn={fDaysIn} events={events} selectedDayFull={selectedDayFull} setSelectedDayFull={setSelectedDayFull} today={today} daysOfWeek={daysOfWeek} onEventDragStart={handleEventDragStart} onDayDrop={handleEventDropToDate} dragOverKey={dragOverKey} setDragOverKey={setDragOverKey} />}
-          </motion.div>
+              view === 'Week' ? <WeekView fullViewDate={fullViewDate} today={today} allApiEvents={filteredApiEvents} setFullViewDate={setFullViewDate} setSelectedDayFull={handleSelectedDayFullChange} onEventDragStart={handleEventDragStart} onDayDrop={handleEventDropToDate} dragOverKey={dragOverKey} setDragOverKey={setDragOverKey} /> :
+              <MonthView fYear={fYear} fMonth={fMonth} fFirstDay={fFirstDay} fDaysIn={fDaysIn} events={events} selectedDayFull={selectedDayFull} setSelectedDayFull={handleSelectedDayFullChange} today={today} daysOfWeek={daysOfWeek} onEventDragStart={handleEventDragStart} onDayDrop={handleEventDropToDate} dragOverKey={dragOverKey} setDragOverKey={setDragOverKey} />}
+          </Motion.div>
         </AnimatePresence>
 
         {view !== 'Year' && (
@@ -1427,7 +1426,7 @@ const Calendar = ({ variant = 'mini' }) => {
                       <button
                         key={ev.id}
                         onClick={() => setSelectedEventIdx(idx)}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all truncate max-w-[160px] ${idx === selectedEventIdx ? 'bg-[#0e4d46] text-white' : 'bg-white text-[#5a827d] border border-gray-200 hover:border-[#0e4d46] hover:text-[#0e4d46]'}`}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all truncate max-w-[160px] ${idx === activeEventIdx ? 'bg-[#0e4d46] text-white' : 'bg-white text-[#5a827d] border border-gray-200 hover:border-[#0e4d46] hover:text-[#0e4d46]'}`}
                       >
                         {ev.title}
                       </button>
@@ -1503,7 +1502,7 @@ const Calendar = ({ variant = 'mini' }) => {
       </div>
 
       {/* Trashcan */}
-      <motion.div 
+      <Motion.div 
         id="trash-bin"
         animate={{ 
           scale: draggingEventId ? (isOverTrash ? 1.3 : 1) : 0,
@@ -1529,7 +1528,7 @@ const Calendar = ({ variant = 'mini' }) => {
         <svg className={`w-6 h-6 relative pointer-events-none transition-all duration-300 z-10 ${isOverTrash ? 'text-red-600 rotate-12 scale-110' : 'text-red-500'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
         </svg>
-      </motion.div>
+      </Motion.div>
     </div>
   );
 };
