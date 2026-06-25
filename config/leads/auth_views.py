@@ -1,4 +1,5 @@
 import logging
+from urllib import response
 
 from django.conf import settings
 from rest_framework import status
@@ -81,16 +82,16 @@ def signup(request):
             key='access_token',
             value=result['access'],
             httponly=True,
-            secure=not settings.DEBUG,
-            samesite='Lax',
+            secure=True,
+            samesite='None',
             max_age=3600 * 2 # 2 hours
         )
         response.set_cookie(
             key='refresh_token',
             value=result['refresh'],
             httponly=True,
-            secure=not settings.DEBUG,
-            samesite='Lax',
+            secure=True,
+            samesite='None',
             max_age=3600 * 24 # 24 hours
         )
         
@@ -157,16 +158,16 @@ def login(request):
         key='access_token',
         value=result['access'],
         httponly=True,
-        secure=not settings.DEBUG,
-        samesite='Lax',
+        secure=True,
+        samesite='None',
         max_age=3600 * 2 # 2 hours
     )
     response.set_cookie(
         key='refresh_token',
         value=result['refresh'],
         httponly=True,
-        secure=not settings.DEBUG,
-        samesite='Lax',
+        secure=True,
+        samesite='None',
         max_age=3600 * 24 # 24 hours
     )
     
@@ -217,9 +218,17 @@ def logout(request):
         )
         
         # Clear cookies
-        response.delete_cookie('access_token')
-        response.delete_cookie('refresh_token')
-        
+        response.delete_cookie(
+            "access_token",
+            samesite="None",
+            secure=True,
+        )   
+
+        response.delete_cookie(
+            "refresh_token",
+            samesite="None",
+            secure=True,
+        )
         return response
     except Exception:
         logger.exception("Logout failed — token blacklist error")
@@ -273,8 +282,8 @@ def cookie_token_refresh(request):
         key='access_token',
         value=access_token,
         httponly=True,
-        secure=not settings.DEBUG,
-        samesite='Lax',
+        secure=True,
+        samesite='None',
         max_age=3600 * 2 # 2 hours
     )
     
@@ -284,8 +293,8 @@ def cookie_token_refresh(request):
             key='refresh_token',
             value=new_refresh_token,
             httponly=True,
-            secure=not settings.DEBUG,
-            samesite='Lax',
+            secure=True,
+            samesite='None',
             max_age=3600 * 24 # 24 hours
         )
         
